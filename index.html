@@ -44,6 +44,14 @@
   body.touch[data-mode="explore"] #pad, body.touch[data-mode="combat"] #pad, body.touch[data-mode="dialogue"] #pad { display: flex; }
   body.touch #dialog { bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); }   /* Z·X 버튼 위로 */
   body.touch #prompt { bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); }
+  /* 가로 화면은 높이가 모자라 대화창을 올리지 않고 Z·X 버튼 왼쪽에 둔다(버튼 묶음 너비 180px + 여백) */
+  @media (orientation: landscape) {
+    body.touch #dialog {
+      left: calc(env(safe-area-inset-left, 0px) + 12px); transform: none; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+      width: calc(100vw - 224px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+      max-height: calc(100vh - 16px); overflow-y: auto;
+    }
+  }
   #stick-zone { position: fixed; left: 0; top: 0; width: 50vw; height: 100%; touch-action: none; }
   #stick { position: absolute; left: calc(env(safe-area-inset-left, 0px) + 24px); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 96px; height: 96px; border-radius: 50%; border: 2px solid rgba(201, 168, 106, 0.6); background: rgba(12, 10, 16, 0.3); opacity: 0.45; pointer-events: none; }
   #stick.on { opacity: 1; bottom: auto; }
