@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../src/story.js';
-import { matches, lightFor, actorsFor, triggersFor, obstaclesFor } from '../src/region.js';
+import { matches, lightFor, actorsFor, triggersFor, blockedFor } from '../src/region.js';
+import { parseMap } from '../src/map.js';
 
 const REGION = {
   light: { 1: 'dusk', 2: 'day' },
@@ -36,14 +37,21 @@ test('actorsFor·triggersFor: 조건에 맞고 끝나지 않은 것만', () => {
   assert.deepEqual(triggersFor(REGION, s).map(t => t.id), ['t1']);
 });
 
-test('obstaclesFor: 소품·배우·벽·조건부 차단물', () => {
+test('blockedFor: 맵의 막힌 칸, 지금 보이는 인물, 조건이 맞아 닫힌 칸', () => {
+  const tiles = { '.': { ground: ['town', 0] }, T: { ground: ['town', 0], solid: true } };
+  const map = parseMap(['.T..', '....'], { minX: 0, minZ: 0 }, tiles, {});
+  const region = {
+    actors: [{ m: 'aion', x: 2, z: 0, day: 1 }, { m: 'aion', x: 3, z: 1, day: 2 }],
+    blockers: [{ x: 0, z: 1, if: '!gate_open' }],
+  };
   const s = createState();
-  const obs = obstaclesFor(REGION, s);
-  assert.ok(obs.some(o => o.x === 1 && o.z === 1 && o.r === 2));
-  assert.ok(!obs.some(o => o.x === 9));
-  assert.ok(obs.some(o => o.x === 0 && o.z === 4 && o.r === 0.7));
-  assert.ok(obs.some(o => o.x === 3 && o.z === 0 && o.r === 1.5));
-  assert.ok(obs.some(o => o.x === 5 && o.z === 5));
+  const blocked = blockedFor(region, map, s);
+  assert.equal(blocked(1, 0), true);    // 나무
+  assert.equal(blocked(2, 0), true);    // 1일째 인물
+  assert.equal(blocked(3, 1), false);   // 2일째 인물은 아직 없다
+  assert.equal(blocked(0, 1), true);    // 닫힌 성문
+  assert.equal(blocked(0, 0), false);
+  assert.equal(blocked(9, 9), true);    // 맵 밖
   s.flags.push('gate_open');
-  assert.ok(!obstaclesFor(REGION, s).some(o => o.x === 5 && o.z === 5));
+  assert.equal(blockedFor(region, map, s)(0, 1), false);
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCRIPT, MEMORIES } from '../data/script.js';
 import { REGIONS, FIGHTS } from '../data/regions.js';
-import { MODELS } from '../data/models.js';
+import { SPRITES } from '../data/sprites.js';
 import { createState, createDialogue, applyEffect, winFight, markDone } from '../src/story.js';
 import { triggersFor } from '../src/region.js';
 import { dist } from '../src/geom.js';
@@ -65,11 +65,11 @@ test('어디서도 닿지 않는 노드가 없다', () => {
   assert.deepEqual(Object.keys(SCRIPT).filter(id => !seen.has(id)), []);
 });
 
-test('트리거 id는 겹치지 않고, 배치한 모델은 모두 정의돼 있다', () => {
+test('트리거 id는 겹치지 않고, 배치한 인물은 모두 그림이 정해져 있다', () => {
   const ids = triggers.map(t => t.id);
   assert.equal(new Set(ids).size, ids.length);
   for (const r of Object.values(REGIONS)) {
-    for (const it of [...r.props, ...r.actors]) assert.ok(MODELS[it.m], `${r.name}: ${it.m}`);
+    for (const a of r.actors) assert.ok(SPRITES[a.m], `${r.name}: ${a.m}`);
   }
 });
 
