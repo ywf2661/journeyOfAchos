@@ -28,8 +28,10 @@ export const SCRIPT = {
     [N, '역병이 돈 지 석 달째. 왕도의 밤은 등불보다 기침 소리가 많다.'],
     [N, '걸린 자는 몸이 조금씩 다른 것으로 변해 간다. 그리고 끝내, 죽는다.'],
     [K, '…오늘 밤 떠난다. 고칠 방법을 찾을 때까지는 돌아오지 않는다.'],
-    [N, '(WASD로 걷고 Shift로 달린다. 마우스를 끌어 둘러본다. 가까이 가서 E로 말을 건다.)'],
-  ]),
+  ], { next: 'r1_open_touch' }),
+  // 조작 안내: 기기에 맞는 쪽 하나만 나온다(touch 플래그는 main.js가 부팅 때 정한다)
+  r1_open_touch: { if: 'touch', who: N, text: '(왼쪽 화면을 끌어 걷고, 끝까지 밀면 달린다. 오른쪽 화면을 끌어 둘러본다. 가까이 가서 아래에 뜨는 안내를 눌러 말을 건다.)', next: 'r1_open_keys' },
+  r1_open_keys: { if: '!touch', who: N, text: '(WASD로 걷고 Shift로 달린다. 마우스를 끌어 둘러본다. 가까이 가서 E로 말을 건다.)' },
 
   ...chain('r1_rack', [
     [N, '숙소 앞의 빈 갑주 걸이. 기둥에 누군가 칼끝으로 새겨 둔 글씨가 있다.'],
@@ -86,8 +88,10 @@ export const SCRIPT = {
   ...chain('r1_road', [
     [N, '어둠 속에서 무언가가 기어 나온다. 검게 굳은 딱지 틈으로 병든 황록빛이 새어 나온다.'],
     [K, '…짐승이었던 것인가. 아니면, 사람이었던 것인가.'],
-    [N, '(클릭으로 벤다. Space로 몸을 피한다. 마우스를 끌면 시야가 돈다.)'],
-  ], { do: 'combat:road' }),
+  ], { next: 'r1_road_touch' }),
+  r1_road_touch: { if: 'touch', who: N, text: '(화면을 탭하거나 [베기]로 벤다. [피하기]로 몸을 피한다.)', next: 'r1_road_keys' },
+  r1_road_keys: { if: '!touch', who: N, text: '(클릭으로 벤다. Space로 몸을 피한다. 마우스를 끌면 시야가 돈다.)', next: 'r1_road_go' },
+  r1_road_go: { do: 'combat:road' },
   ...chain('r1_road_after', [[K, '사람만이 아니군. 이 병은 무엇이든 다른 것으로 바꿔 놓는다.']]),
 
   ...chain('r1_traveler', [

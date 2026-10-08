@@ -74,8 +74,9 @@ test('트리거 id는 겹치지 않고, 배치한 모델은 모두 정의돼 있
 });
 
 // 트리거를 하나씩 골라 대화를 끝까지 넘기고, 효과를 적용하며 엔딩까지 간다. 전투는 이긴 것으로 친다.
-function playthrough({ pickTrigger, pickChoice }) {
+function playthrough({ pickTrigger, pickChoice, flags = [] }) {
   const state = createState();
+  state.flags.push(...flags);
   function run(id) {
     const d = createDialogue(SCRIPT, state);
     for (let v = d.start(id); v; ) v = v.choices ? d.choose(pickChoice(v.choices.length)) : d.next();
@@ -132,4 +133,29 @@ test('이어하기 시작점이 조건부 자동 트리거 안에 있지 않다'
   for (const r of Object.values(REGIONS)) {
     for (const t of r.triggers) if (t.auto && t.if) assert.ok(dist(r.start, t) > t.r, `${r.name}: ${t.id}`);
   }
+});
+
+
+// 대화를 끝까지 넘기며 나온 글과, 대화가 끝난 뒤 꺼낼 효과
+function linesOf(start, flags) {
+  const d = createDialogue(SCRIPT, { ...createState(), flags });
+  const out = [];
+  for (let v = d.start(start); v; v = d.next()) out.push(v.text);
+  return { text: out.join('\n'), effects: d.takeEffects() };
+}
+
+test('touch가 켜져 있으면 터치 안내만, 꺼져 있으면 키보드 안내만 나온다', () => {
+  const touchOpen = linesOf('r1_open', ['touch']).text, keysOpen = linesOf('r1_open', []).text;
+  assert.ok(touchOpen.includes('왼쪽 화면을 끌어') && !touchOpen.includes('WASD'), touchOpen);
+  assert.ok(keysOpen.includes('WASD') && !keysOpen.includes('왼쪽 화면을 끌어'), keysOpen);
+  const touchRoad = linesOf('r1_road', ['touch']), keysRoad = linesOf('r1_road', []);
+  assert.ok(touchRoad.text.includes('[베기]') && !touchRoad.text.includes('Space'), touchRoad.text);
+  assert.ok(keysRoad.text.includes('Space') && !keysRoad.text.includes('[베기]'), keysRoad.text);
+  assert.deepEqual(touchRoad.effects, ['combat:road']);
+  assert.deepEqual(keysRoad.effects, ['combat:road']);
+});
+
+test('touch 상태로도 끝까지 갈 수 있다', () => {
+  const s = playthrough({ pickTrigger: a => a[0], pickChoice: () => 0, flags: ['touch'] });
+  assert.equal(s.ended, true);
 });
