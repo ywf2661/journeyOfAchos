@@ -199,11 +199,20 @@ function loseFight() {
   setTimeout(() => startFight(id).catch(fail), 1800);
 }
 
-// Task 10에서 함께 걷는 연출로 바뀐다. 지금은 엔딩 대사만 띄운다.
+// 엔딩: 저장을 지우고, 둘이 지평선(-z) 쪽으로 천천히 걷는 동안 회상 대사를 띄운다.
 function startEnding() {
   clearSave(storage);
-  ending = {};
+  ending = { aion: world.actors.find(a => a.def.m === 'mage') };
+  player.teleport(player.state.x, player.state.z, Math.PI);
+  player.state.auto = true;
+  ending.aion?.anim.play('Walking_A');
   openDialogue('ending');
+}
+
+function followAion() {
+  if (!ending.aion) return;
+  ending.aion.obj.position.set(player.state.x + 1.6, 0, player.state.z + 0.6);
+  ending.aion.obj.rotation.y = Math.PI;
 }
 
 async function finish() {
@@ -240,6 +249,7 @@ renderer.setAnimationLoop(() => {
   }
   if (mode === 'explore') checkTriggers();
   if (mode === 'combat') stepFight(dt);
+  if (ending) followAion();
   renderer.render(scene, camera);
 });
 
