@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, has, createDialogue, speakerName } from '../src/story.js';
+import { createState, has, createDialogue, speakerName, markDone, applyEffect, winFight, SAVE_KEY, saveGame, loadGame, clearSave } from '../src/story.js';
 
 const SCRIPT = {
   a: { who: 'x', text: '첫 줄', next: 'b' },
@@ -98,4 +98,71 @@ test('아이온은 이름을 알기 전에는 마술사로 표시한다', () => 
   assert.equal(speakerName('@aion', s), '아이온');
   assert.equal(speakerName('왕', s), '왕');
   assert.equal(speakerName('', s), '');
+});
+
+test('효과: 다음 날, 지역 이동, 엔딩', () => {
+  const s = createState();
+  assert.deepEqual(applyEffect(s, 'nextDay'), { type: 'reload' });
+  assert.equal(s.day, 2);
+  assert.deepEqual(applyEffect(s, 'region:3'), { type: 'reload' });
+  assert.equal(s.region, 3);
+  assert.equal(s.day, 1);
+  assert.deepEqual(applyEffect(s, 'ending'), { type: 'ending' });
+  assert.equal(s.ended, true);
+  assert.throws(() => applyEffect(s, 'dance'), /모르는 효과/);
+});
+
+test('전투 효과는 진행 중인 전투를 기록하고, 이기면 지우고 이어질 노드를 준다', () => {
+  const s = createState();
+  assert.deepEqual(applyEffect(s, 'combat:road'), { type: 'combat', id: 'road' });
+  assert.equal(s.pendingFight, 'road');
+  assert.equal(winFight(s, { road: { then: 'after' } }), 'after');
+  assert.equal(s.pendingFight, null);
+  assert.equal(has(s, 'won:road'), true);
+});
+
+test('markDone은 done:<id> 플래그를 켠다', () => {
+  const s = createState();
+  markDone(s, { id: 't1' });
+  assert.equal(has(s, 'done:t1'), true);
+});
+
+function memStorage() {
+  const m = new Map();
+  return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) };
+}
+const denied = () => { throw new Error('denied'); };
+const brokenStorage = { getItem: denied, setItem: denied, removeItem: denied };
+
+test('저장하고 불러오면 같은 상태다(진행 중인 전투 포함)', () => {
+  const st = memStorage();
+  const s = createState();
+  s.region = 2; s.day = 3; s.flags.push('soldiers'); s.memories.push('mem_ring'); s.pendingFight = 'freeze';
+  assert.equal(saveGame(st, s), true);
+  assert.deepEqual(loadGame(st), s);
+});
+
+test('저장이 없거나 깨졌거나 형식이 다르면 null', () => {
+  const st = memStorage();
+  assert.equal(loadGame(st), null);
+  for (const raw of ['{', 'null', '42', '{"v":2}', JSON.stringify({ ...createState(), region: 9 }),
+    JSON.stringify({ ...createState(), flags: [1] }), JSON.stringify({ ...createState(), ended: true })]) {
+    st.setItem(SAVE_KEY, raw);
+    assert.equal(loadGame(st), null, raw);
+  }
+});
+
+test('저장소가 막혀 있거나 없어도 예외 없이 넘어간다', () => {
+  assert.equal(saveGame(brokenStorage, createState()), false);
+  assert.equal(loadGame(brokenStorage), null);
+  assert.doesNotThrow(() => clearSave(brokenStorage));
+  assert.equal(saveGame(null, createState()), false);
+  assert.equal(loadGame(null), null);
+});
+
+test('clearSave 뒤에는 불러올 것이 없다', () => {
+  const st = memStorage();
+  saveGame(st, createState());
+  clearSave(st);
+  assert.equal(loadGame(st), null);
 });

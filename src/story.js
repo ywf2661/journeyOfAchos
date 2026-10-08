@@ -68,3 +68,54 @@ export function createDialogue(script, state) {
     takeEffects: () => effects.splice(0),
   };
 }
+
+export function markDone(state, trigger) {
+  addFlag(state, `done:${trigger.id}`);
+}
+
+// 대화가 끝난 뒤 do 효과를 상태에 반영하고, 화면 쪽에서 할 일을 돌려준다.
+export function applyEffect(state, fx) {
+  const [kind, arg] = fx.split(':');
+  switch (kind) {
+    case 'nextDay': state.day += 1; return { type: 'reload' };
+    case 'region': state.region = Number(arg); state.day = 1; return { type: 'reload' };
+    case 'combat': state.pendingFight = arg; return { type: 'combat', id: arg };
+    case 'ending': state.ended = true; return { type: 'ending' };
+    default: throw new Error(`모르는 효과: ${fx}`);
+  }
+}
+
+export function winFight(state, fights) {
+  const id = state.pendingFight;
+  state.pendingFight = null;
+  addFlag(state, `won:${id}`);
+  return fights[id].then;
+}
+
+export const SAVE_KEY = 'journeyOfAchos.save';
+
+export function saveGame(storage, state) {
+  try { storage.setItem(SAVE_KEY, JSON.stringify(state)); return true; } catch { return false; }
+}
+
+const isStrings = a => Array.isArray(a) && a.every(x => typeof x === 'string');
+
+function isValidSave(s) {
+  return s?.v === 1 && [1, 2, 3].includes(s.region) && [1, 2, 3].includes(s.day)
+    && isStrings(s.flags) && isStrings(s.memories)
+    && (s.pendingFight === null || typeof s.pendingFight === 'string')
+    && s.ended === false;
+}
+
+export function loadGame(storage) {
+  try {
+    const s = JSON.parse(storage.getItem(SAVE_KEY));
+    return isValidSave(s) ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSave(storage) {
+  try { storage.removeItem(SAVE_KEY); } catch { /* 저장소가 막혀 있으면 지울 것도 없다 */ }
+}
