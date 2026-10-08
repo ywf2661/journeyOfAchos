@@ -12,7 +12,7 @@
   :root { --gold: #c9a86a; --ink: #e8e0d0; --dim: #9a9284; --panel: rgba(12, 10, 16, 0.86); }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: var(--ink); font-family: 'Nanum Myeongjo', serif; }
-  canvas#game { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  canvas#game { display: block; image-rendering: pixelated; touch-action: none; }   /* 크기는 draw.js가 정수 배율로 정한다 */
   [hidden] { display: none !important; }
   .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem; text-align: center; padding: 1rem; }
   #title, #end { background: radial-gradient(ellipse at center, #1d1726 0%, #050407 75%); }
@@ -27,8 +27,8 @@
   #text.narration { color: #c8c0d8; font-style: italic; }
   #choices { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.8rem; }
   #choices button { text-align: left; min-width: 0; }
+  #choices button.sel { background: rgba(201, 168, 106, 0.28); }   /* 방향키로 고른 선택지 */
   #prompt { position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 0.4rem 1rem; min-width: 0; min-height: 56px; width: max-content; max-width: 90vw; }
-  body.touch #prompt { bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); }   /* 조이스틱 원(아래 24~120px) 위로 */
   #toast { position: fixed; top: 4vh; right: 3vw; background: var(--panel); border-left: 3px solid #a98be0; padding: 0.7rem 1.1rem; }
   #hud { position: fixed; top: 3vh; left: 3vw; font-size: 1.4rem; letter-spacing: 0.2em; color: #e07a6a; }
   #timer { color: #c8b0f0; font-size: 1rem; letter-spacing: 0; margin-left: 1rem; }
@@ -36,33 +36,27 @@
   #fade.on { opacity: 1; }
   #error { background: rgba(0, 0, 0, 0.94); color: #f0c0b0; white-space: pre-wrap; }
 
-  /* 터치 조작 — body.touch(휴대폰·태블릿)이고 탐험·전투 중일 때만 보인다 */
+  /* 터치 조작 — body.touch(휴대폰·태블릿)일 때만. 조이스틱은 탐험·전투, Z·X는 대화 중에도 보인다 */
   body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   button, #dialog { touch-action: manipulation; }
-  #stick-zone, #combat-buttons { display: none; }
+  #stick-zone, #pad { display: none; }
   body.touch[data-mode="explore"] #stick-zone, body.touch[data-mode="combat"] #stick-zone { display: block; }
-  body.touch[data-mode="combat"] #combat-buttons { display: flex; }
+  body.touch[data-mode="explore"] #pad, body.touch[data-mode="combat"] #pad, body.touch[data-mode="dialogue"] #pad { display: flex; }
+  body.touch #dialog { bottom: calc(env(safe-area-inset-bottom, 0px) + 132px); }   /* Z·X 버튼 위로 */
+  body.touch #prompt { bottom: calc(env(safe-area-inset-bottom, 0px) + 140px); }
   #stick-zone { position: fixed; left: 0; top: 0; width: 50vw; height: 100%; touch-action: none; }
   #stick { position: absolute; left: calc(env(safe-area-inset-left, 0px) + 24px); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 96px; height: 96px; border-radius: 50%; border: 2px solid rgba(201, 168, 106, 0.6); background: rgba(12, 10, 16, 0.3); opacity: 0.45; pointer-events: none; }
   #stick.on { opacity: 1; bottom: auto; }
   #stick-knob { position: absolute; left: 22px; top: 22px; width: 48px; height: 48px; border-radius: 50%; background: rgba(201, 168, 106, 0.65); }
-  #combat-buttons { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 20px); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); gap: 16px; align-items: flex-end; }
-  #combat-buttons button { min-width: 0; width: 72px; height: 72px; padding: 0; border-radius: 50%; background: var(--panel); touch-action: none; }
-  #combat-buttons #btn-attack { width: 88px; height: 88px; }
+  #pad { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 20px); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); gap: 16px; align-items: flex-start; }
+  #pad button { min-width: 0; width: 72px; height: 72px; padding: 0; border-radius: 50%; background: var(--panel); touch-action: none; font-size: 1.6rem; font-family: monospace; }
+  #pad #btn-x { margin-top: 32px; }   /* 게임보이처럼 Z(A)가 오른쪽 위, X(B)가 왼쪽 아래 */
 </style>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-  }
-}
-</script>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="stick-zone"><div id="stick"><div id="stick-knob"></div></div></div>
-<div id="combat-buttons"><button id="btn-dodge">피하기</button><button id="btn-attack">베기</button></div>
+<div id="pad"><button id="btn-x">X</button><button id="btn-z">Z</button></div>
 <div id="hud" hidden><span id="hearts"></span><span id="timer"></span></div>
 <button id="prompt" hidden></button>
 <div id="toast" hidden></div>
@@ -81,6 +75,6 @@
 </div>
 <div id="error" class="overlay" hidden></div>
 <script type="module" src="src/main.js"
-  onerror="var e=document.getElementById('error');e.textContent='게임 파일을 불러오지 못했습니다.\n인터넷 연결을 확인하고 새로고침해 주세요.';e.hidden=false"></script>
+  onerror="var e=document.getElementById('error');e.textContent='게임 파일을 불러오지 못했습니다.\n새로고침해 주세요.';e.hidden=false"></script>
 </body>
 </html>

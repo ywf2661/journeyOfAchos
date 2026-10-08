@@ -1,6 +1,17 @@
 // DOM 오버레이: 대화창, 프롬프트, 토스트, HUD, 페이드, 타이틀/엔딩 화면, 오류, 시계 소리.
 const $ = id => document.getElementById(id);
 let typing = null;
+let sel = 0;   // 방향키로 고른 선택지
+function markChoice() {
+  [...$('choices').children].forEach((b, i) => b.classList.toggle('sel', i === sel));
+}
+export function moveChoice(d) {
+  const n = $('choices').children.length;
+  if (!n) return;
+  sel = (sel + d + n) % n;
+  markChoice();
+}
+export const selectedChoice = () => sel;
 
 export function showPrompt(text) {
   $('prompt').textContent = text ?? '';
@@ -29,6 +40,8 @@ export function showLine(view, speaker, onChoose) {
       b.onclick = e => { e.stopPropagation(); onChoose(idx); };
       choicesEl.append(b);
     });
+    sel = 0;
+    markChoice();
   }
   typing = { id: setInterval(() => { textEl.textContent += chars[i++] ?? ''; if (i >= chars.length) finish(); }, 28), finish };
   if (!chars.length) finish();

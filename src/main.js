@@ -1,47 +1,36 @@
-// 진입점: 렌더러, 게임 루프, 모드 전환(타이틀 → 탐험 ⇄ 대화 ⇄ 전투 → 엔딩).
-import * as THREE from 'three';
+// 진입점: 게임 루프와 모드 전환(타이틀 → 탐험 ⇄ 대화 ⇄ 전투 → 엔딩).
 import { SCRIPT, MEMORIES } from '../data/script.js';
 import { REGIONS, FIGHTS } from '../data/regions.js';
+import { TILES, STAMPS } from '../data/tiles.js';
+import { SPRITES } from '../data/sprites.js';
 import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave } from './story.js';
-import { triggersFor, obstaclesFor } from './region.js';
+import { triggersFor, actorsFor, blockedFor, lightFor, matches } from './region.js';
+import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
-import { buildRegion, spawn, animate, plagueLook } from './world.js';
+import { createWalker, step, dash, front, OPPOSITE } from './player.js';
 import { createFight, update as updateFight, swing, dodge, PLAYER_MAX_HP } from './combat.js';
-import { createPlayer } from './player.js';
+import { createInput } from './input.js';
 import { createTouchControls } from './touch.js';
+import { loadSheets, createRenderer } from './draw.js';
 import * as ui from './ui.js';
 
-const canvas = document.getElementById('game');
 // 주로 터치로 조작하는 기기(휴대폰·태블릿). 부팅 때 한 번 정한다.
 const TOUCH = matchMedia('(pointer: coarse)').matches;
 document.body.classList.toggle('touch', TOUCH);
-let renderer;
-try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
-catch (e) { ui.showError('이 브라우저에서 WebGL을 쓸 수 없습니다.'); throw e; }
-// 휴대폰은 화면 배율이 높아(보통 3) 그대로 그리면 무겁다. 해상도와 그림자를 낮춘다.
-renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
-function resize() {
-  renderer.setSize(innerWidth, innerHeight);
-  camera.aspect = innerWidth / innerHeight;
-  camera.fov = innerHeight > innerWidth ? 70 : 55;   // 세로 화면은 시야를 넓혀 아코스가 화면을 덜 가리게
-  camera.updateProjectionMatrix();
-}
-addEventListener('resize', resize);
-resize();
-
 // localStorage 접근 자체가 막혀 있으면 null. story.js의 저장 함수들은 null도 받아 준다.
 const storage = (() => { try { return localStorage; } catch { return null; } })();
-let state, world, player, hero;
+const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
+const input = createInput({ onPress });
+
+let renderer, state, hero, blocked;
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
-let dialogue = null, view = null, ending = null;
-let fight = null, enemies = [], dying = [], tickAcc = 0;
+let dialogue = null, view = null, ending = false;
+let fight = null, looks = [], slashes = [], hurt = 0, tickAcc = 0, time = 0;
 
 const region = () => REGIONS[state.region];
+const map = () => MAPS[state.region];
+// 플래그가 바뀌면(성문이 열림, 인물이 나타남) 다시 만든다
+const refreshBlocked = () => { blocked = blockedFor(region(), map(), state); };
 
 function fail(e) {
   console.error(e);
@@ -53,43 +42,37 @@ async function enterRegion() {
   mode = 'loading';
   ui.showPrompt(null);
   await ui.fade(true);
-  if (world) scene.remove(world.root);
-  world = await buildRegion(scene, region(), state, { shadowSize: TOUCH ? 1024 : 2048 });
-  if (!player) {
-    const obj = await spawn('knight');
-    hero = animate(obj);
-    scene.add(obj);
-    player = createPlayer(obj, hero, camera, canvas);
-    player.onClick = attack;
-  }
   const s = region().start;
-  player.teleport(s.x, s.z, s.rot);
+  hero = createWalker(s.x, s.z, s.dir);
+  refreshBlocked();
   saveGame(storage, state);
   await ui.fade(false);
-  if (state.pendingFight) await startFight(state.pendingFight);
+  if (state.pendingFight) startFight(state.pendingFight);
   else mode = 'explore';
 }
 
-function nearestTrigger() {
-  let best = null, bestD = Infinity;
+// 바라보는 앞 칸에서 1.5칸 안에 있는, 말을 걸 수 있는 트리거(가장 가까운 것)
+function facingTrigger() {
+  const f = front(hero);
+  let best = null, bestD = 1.5;
   for (const t of triggersFor(region(), state)) {
-    const d = dist(player.state, t);
-    if (d <= t.r && d < bestD) { best = t; bestD = d; }
+    const d = dist(f, t);
+    if (!t.auto && d <= bestD) { best = t; bestD = d; }
   }
   return best;
 }
 
 function checkTriggers() {
-  const t = nearestTrigger();
-  if (t?.auto) return openDialogue(t.node, t);
-  ui.showPrompt(t ? `${TOUCH ? '' : '[E] '}${t.label}${t.ends ? ' (되돌릴 수 없음)' : ''}` : null);
+  const auto = triggersFor(region(), state).find(t => t.auto && dist(hero, t) <= t.r);
+  if (auto) return openDialogue(auto.node, auto);
+  const t = facingTrigger();
+  ui.showPrompt(t ? `${t.label}${t.ends ? ' (되돌릴 수 없음)' : ''}` : null);
 }
 
 function openDialogue(nodeId, trigger) {
   if (trigger) markDone(state, trigger);
   mode = 'dialogue';
-  player.clearKeys();
-  hero.play('Idle');
+  input.clear();
   ui.showPrompt(null);
   dialogue = createDialogue(SCRIPT, state);
   show(dialogue.start(nodeId));
@@ -103,6 +86,13 @@ function show(v) {
   ui.showLine(v, speakerName(v.who, state), i => show(dialogue.choose(i)));
 }
 
+// Z: 글자가 덜 나왔으면 마저 보이고, 선택지면 고른 것을, 아니면 다음 대사
+function confirm() {
+  if (ui.completeTyping()) return;
+  show(view?.choices ? dialogue.choose(ui.selectedChoice()) : dialogue.next());
+}
+
+// X·대화창 클릭: 대사만 넘긴다(선택지는 고르지 않는다)
 function advance() {
   if (ui.completeTyping() || view?.choices) return;
   show(dialogue.next());
@@ -117,46 +107,28 @@ async function closeDialogue() {
   const cmds = effects.map(fx => applyEffect(state, fx));
   if (cmds.some(c => c.type === 'ending')) return startEnding();
   saveGame(storage, state);
+  refreshBlocked();
   for (const c of cmds) {
     if (c.type === 'reload') await enterRegion();
-    if (c.type === 'combat') await startFight(c.id);
+    if (c.type === 'combat') startFight(c.id);
   }
 }
 
-async function startFight(id) {
-  mode = 'loading';
+function startFight(id) {
   const def = FIGHTS[id];
   fight = createFight(def);
-  if (def.player) player.teleport(...def.player);
-  enemies = await Promise.all(fight.enemies.map(async e => {
-    const obj = await spawn('minion', { x: e.x, z: e.z });
-    plagueLook(obj);
-    const anim = animate(obj);
-    scene.add(obj);
-    return { obj, anim };
-  }));
-  // 멈춘 시간: 달려들던 자세 그대로 굳혀 둔다(믹서를 조금만 돌리고 더 돌리지 않는다).
-  if (def.frozen) for (const { anim } of enemies) { anim.play('Running_A'); anim.mixer.update(0.4); }
+  if (def.player) hero = createWalker(...def.player);
+  looks = fight.enemies.map(() => ({ red: 0, white: 0, gone: 0 }));
   ui.setFrozenLook(!!def.frozen);
   tickAcc = 0;
   mode = 'combat';
 }
 
 function stepFight(dt) {
-  const events = updateFight(fight, dt, player.state);
-  fight.enemies.forEach((e, i) => {
-    const { obj, anim } = enemies[i];
-    if (e.hp <= 0) { anim.mixer.update(dt); return; }
-    obj.position.set(e.x, 0, e.z);
-    obj.rotation.y = Math.atan2(player.state.x - e.x, player.state.z - e.z);
-    if (fight.def.frozen) return;
-    anim.mixer.update(dt);
-    if (!anim.busy()) anim.play(dist(e, player.state) > 1.6 ? 'Walking_A' : 'Idle');
-  });
-  for (const ev of events) {
+  for (const ev of updateFight(fight, dt, hero)) {
     const [kind, i] = ev.split(':');
-    if (kind === 'windup') enemies[i].anim.play('1H_Melee_Attack_Chop', { once: true });
-    if (kind === 'hurt') hero.play('Hit_A', { once: true });
+    if (kind === 'windup') looks[i].red = 0.5;
+    if (kind === 'hurt') hurt = 0.4;
     if (kind === 'lost') return loseFight();
   }
   if (fight.def.frozen && (tickAcc += dt) >= 1) { tickAcc -= 1; ui.tick(); }
@@ -164,62 +136,53 @@ function stepFight(dt) {
 }
 
 function attack() {
-  if (mode !== 'combat') return;
-  const events = swing(fight, player.state);
+  const events = swing(fight, hero);
   if (!events.length) return;
-  hero.play('1H_Melee_Attack_Slice_Horizontal', { once: true });
+  slashes.push({ x: hero.x, z: hero.z, facing: hero.facing, life: 0.12 });
   for (const ev of events) {
     const [kind, i] = ev.split(':');
-    if (kind === 'hit') enemies[i].anim.play('Hit_A', { once: true });
-    if (kind === 'down') enemies[i].anim.play('Death_A', { once: true });
+    if (kind === 'hit' || kind === 'down') looks[i].white = 0.15;
     if (kind === 'won') winCurrentFight();
   }
+}
+
+// 피하기: 무적(combat.dodge)과 함께 누르고 있는 방향(없으면 뒤로) 한 칸
+function dodgeAction() {
+  if (dodge(fight)) dash(hero, input.state().dir ?? OPPOSITE[hero.dir], blocked);
 }
 
 function clearFight() {
   ui.setFrozenLook(false);
   ui.hideHud();
-  dying = enemies;
-  enemies = [];
   fight = null;
+  looks = [];
 }
 
+// 이기거나 지면 잠깐 그대로 보여 준 뒤(쓰러진 적이 깜빡이며 사라진다) 정리한다
 function winCurrentFight() {
   mode = 'loading';
-  clearFight();
   setTimeout(() => {
-    for (const e of dying) scene.remove(e.obj);
-    dying = [];
+    clearFight();
     openDialogue(winFight(state, FIGHTS));
-  }, 1500);
+  }, 1200);
 }
 
 function loseFight() {
   mode = 'loading';
-  const id = state.pendingFight, frozen = fight.def.frozen;
-  clearFight();
-  for (const e of dying) scene.remove(e.obj);
-  dying = [];
-  hero.play('Death_A', { once: true });
-  ui.toast(frozen ? '멈춘 시간이 다시 흐른다… 처음부터.' : '쓰러졌다… 다시 일어선다.');
-  setTimeout(() => startFight(id).catch(fail), 1800);
+  const id = state.pendingFight;
+  ui.toast(fight.def.frozen ? '멈춘 시간이 다시 흐른다… 처음부터.' : '쓰러졌다… 다시 일어선다.');
+  setTimeout(() => {
+    clearFight();
+    startFight(id);
+  }, 1800);
 }
 
-// 엔딩: 둘이 지평선(-z) 쪽으로 천천히 걷는 동안 회상 대사를 띄운다.
+// 엔딩: 둘이 지평선(북쪽)으로 천천히 걷는 동안 회상 대사를 띄운다.
 // 저장은 끝 화면에서 지운다 — 회상 도중 새로고침하면 다리에서 엔딩을 다시 볼 수 있다.
 function startEnding() {
-  ending = { aion: world.actors.find(a => a.def.m === 'mage') };
-  player.teleport(player.state.x, player.state.z, Math.PI);
-  player.state.auto = true;
-  ending.aion?.anim.play('Walking_A');
+  ending = true;
+  hero = createWalker(Math.round(hero.x), Math.round(hero.z), 'up');
   openDialogue('ending');
-}
-
-function followAion() {
-  if (!ending.aion) return;
-  ending.aion.anim.play(player.state.moving ? 'Walking_A' : 'Idle');
-  ending.aion.obj.position.set(player.state.x + 1.6, 0, player.state.z + 0.6);
-  ending.aion.obj.rotation.y = Math.PI;
 }
 
 async function finish() {
@@ -230,48 +193,85 @@ async function finish() {
   location.reload();
 }
 
-// 키보드와 화면 버튼(말 걸기 안내, 터치 전투 버튼)이 함께 부르는 동작
-function interact() {
-  if (mode !== 'explore') return;
-  const t = nearestTrigger();
-  if (t && !t.auto) openDialogue(t.node, t);
-}
-
-function dodgeAction() {
-  if (mode === 'combat' && dodge(fight)) player.dash();
-}
-
-const ADVANCE_KEYS = ['Space', 'KeyE', 'Enter', 'NumpadEnter'];
-addEventListener('keydown', e => {
-  if (e.repeat) return;
+// 버튼을 누르는 순간: 모드에 따라 Z·X·방향의 뜻이 다르다
+function onPress(b) {
   if (mode === 'dialogue') {
-    if (ADVANCE_KEYS.includes(e.code)) advance();
-    const n = Number(e.code.match(/^Digit([1-9])$/)?.[1]);
-    if (n && view?.choices && !ui.completeTyping() && n <= view.choices.length) show(dialogue.choose(n - 1));
-  } else if (e.code === 'KeyE') interact();
-  else if (e.code === 'Space') dodgeAction();
+    if (b === 'z') confirm();
+    else if (b === 'x') advance();
+    else if (b === 'up' || b === 'down') ui.moveChoice(b === 'up' ? -1 : 1);
+  } else if (mode === 'explore' && b === 'z') {
+    const t = facingTrigger();
+    if (t) openDialogue(t.node, t);
+  } else if (mode === 'combat') {
+    if (b === 'z') attack();
+    if (b === 'x') dodgeAction();
+  }
+}
+
+// 숫자 1~9로 선택지를 바로 고른다
+addEventListener('keydown', e => {
+  const n = Number(e.code.match(/^Digit([1-9])$/)?.[1]);
+  if (mode === 'dialogue' && n && !e.repeat && view?.choices && !ui.completeTyping() && n <= view.choices.length) {
+    show(dialogue.choose(n - 1));
+  }
 });
 ui.onDialogClick(() => { if (mode === 'dialogue') advance(); });
-ui.onPromptClick(interact);
-if (TOUCH) createTouchControls({ onStick: axes => player?.setStick(axes), onAttack: attack, onDodge: dodgeAction });
+ui.onPromptClick(() => onPress('z'));
+if (TOUCH) createTouchControls({ onStick: a => input.setStick(a), onButton: (b, down) => input.button(b, down) });
 
-const clock = new THREE.Clock();
-renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
+function render(dt) {
+  slashes = slashes.filter(s => (s.life -= dt) > 0);
+  hurt = Math.max(0, hurt - dt);
+  const bob = moving => moving && Math.floor(time * 8) % 2 === 1;
+  const things = actorsFor(region(), state).map(a => {
+    const follow = ending && a.m === 'aion';   // 엔딩: 아이온이 아코스 오른쪽에서 함께 걷는다
+    const sp = SPRITES[a.m];
+    return { art: sp.art, tint: a.tint ?? sp.tint, x: follow ? hero.x + 1 : a.x, z: follow ? hero.z : a.z, lie: a.lie, bob: follow && bob(hero.moving) };
+  });
+  things.push({
+    art: SPRITES.achos.art, x: hero.x, z: hero.z, flip: hero.dir === 'left', bob: bob(hero.moving),
+    tint: hurt > 0 ? '#c0392b' : SPRITES.achos.tint, alpha: fight?.invuln > 0 ? 0.5 : 1,
+  });
+  fight?.enemies.forEach((e, i) => {
+    const l = looks[i], p = SPRITES.plague;
+    l.red = Math.max(0, l.red - dt);
+    l.white = Math.max(0, l.white - dt);
+    if (e.hp <= 0) l.gone += dt;
+    if (l.gone > 0.6) return;
+    things.push({
+      art: p.art, x: e.x, z: e.z, flip: e.x > hero.x,
+      tint: l.white > 0 ? '#ffffff' : l.red > 0 ? '#c0392b' : p.tint,
+      alpha: e.hp <= 0 && Math.floor(l.gone * 10) % 2 ? 0.2 : 1,
+    });
+  });
+  renderer.draw({
+    map: map(), cam: hero, things, slashes, t: time,
+    blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
+    marks: mode === 'explore' && facingTrigger() ? [{ x: hero.x, z: hero.z }] : [],
+    light: lightFor(region(), state),
+  });
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  time += dt;
   document.body.dataset.mode = mode;   // 터치 조작이 보일지는 CSS(body.touch[data-mode])가 정한다
-  world?.update(dt, t);
-  hero?.mixer.update(dt);
-  for (const e of dying) e.anim.mixer.update(dt);
-  if (player && (mode === 'explore' || mode === 'combat' || ending)) {
-    player.update(dt, obstaclesFor(region(), state), region().bounds);
+  if (hero && ending) {
+    // 엔딩 자동 걷기는 인물을 무시하고, 맵의 막힌 칸(지평선의 성)에서 선다
+    step(hero, { dir: 'up', auto: true }, dt, (x, z) => isSolid(map(), x, z));
+  } else if (hero && (mode === 'explore' || mode === 'combat')) {
+    step(hero, input.state(), dt, blocked);
   }
   if (mode === 'explore') checkTriggers();
   if (mode === 'combat') stepFight(dt);
-  if (ending) followAion();
-  renderer.render(scene, camera);
-});
+  if (hero) render(dt);
+  requestAnimationFrame(frame);
+}
 
 async function boot() {
+  renderer = createRenderer(document.getElementById('game'), await loadSheets());
   const saved = loadGame(storage);
   state = (await ui.showTitle(!!saved)) === 'continue' ? saved : createState();
   if (state.pendingFight && !FIGHTS[state.pendingFight]) state.pendingFight = null;
@@ -280,4 +280,5 @@ async function boot() {
   if (TOUCH) state.flags.push('touch');
   await enterRegion();
 }
+requestAnimationFrame(frame);
 boot().catch(fail);

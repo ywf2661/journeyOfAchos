@@ -18,7 +18,7 @@ export const TILES = {
   '+': { ground: dun(37) },                                       // 나무 다리
   '~': { ground: bat(37), solid: true },                          // 물
   W: { ground: bat(75), solid: true },                            // 멈춘 폭포
-  T: { ground: town(0), top: town(4), solid: true },              // 초록 나무
+  T: { ground: town(0), top: town(28), solid: true },             // 초록 나무
   t: { ground: town(0), top: town(16), solid: true },             // 작은 초록 나무
   Y: { ground: town(0), top: town(3), solid: true },              // 단풍 나무
   y: { ground: town(0), top: town(15), solid: true },             // 작은 단풍 나무
