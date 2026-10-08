@@ -1,97 +1,72 @@
-// 3인칭 조작: 이동(키보드 WASD·방향키 또는 터치 조이스틱), 달리기, 드래그로 시야 회전, 짧은 탭·클릭 콜백, 회피 대시.
-// 키는 e.code로 읽는다. 한글 입력 상태에서도 같은 자리의 키가 같은 뜻이 된다.
-import { moveVector, facingOf, resolve, dist } from './geom.js';
-
-const WALK = 4.2, RUN = 7.5, DASH = 13, DASH_TIME = 0.25, AUTO_WALK = 1.3, RADIUS = 0.6, CAM_DIST = 9;
-export const RUN_TILT = 0.85;   // 조이스틱을 이만큼 이상 기울이면 달린다
-const CODES = {
-  KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd',
-  ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd',
-  ShiftLeft: 'shift', ShiftRight: 'shift',
+// 포켓몬식 칸 이동: 4방향, 한 칸씩. 순수 함수(DOM 없음).
+// 좌표 1 = 한 칸. 방향각은 geom.js 규약(앞 = (sin θ, cos θ))이라 전투 규칙(inArc)에 그대로 쓴다.
+export const WALK = 4, RUN = 8, DASH = 14, AUTO = 1.3;   // 칸/초
+export const TURN = 0.08;   // 선 자리에서 돌아설 때, 이보다 짧게 누르면 방향만 바꾼다(초)
+export const DIRS = {
+  up: { dx: 0, dz: -1, facing: Math.PI },
+  down: { dx: 0, dz: 1, facing: 0 },
+  left: { dx: -1, dz: 0, facing: -Math.PI / 2 },
+  right: { dx: 1, dz: 0, facing: Math.PI / 2 },
 };
+export const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
-export function createPlayer(obj, anim, camera, canvas) {
-  const keys = {};
-  const st = { x: 0, z: 0, facing: 0, auto: false, moving: false };
-  let yaw = 0, pitch = 0.32, dash = 0, dashDir = null, drag = null, stick = null, onClick = () => {};
-
-  const keyAxes = () => ({ f: (keys.w ? 1 : 0) - (keys.s ? 1 : 0), r: (keys.d ? 1 : 0) - (keys.a ? 1 : 0) });
-  // 대화가 열리거나 창이 포커스를 잃으면 눌려 있던 키와 조이스틱을 놓는다.
-  const clearKeys = () => {
-    for (const k in keys) keys[k] = false;
-    stick = null;
-  };
-  addEventListener('keydown', e => { if (CODES[e.code]) keys[CODES[e.code]] = true; });
-  addEventListener('keyup', e => { if (CODES[e.code]) keys[CODES[e.code]] = false; });
-  addEventListener('blur', clearKeys);
-  canvas.addEventListener('contextmenu', e => e.preventDefault());
-  // 시야 드래그는 시작한 포인터 하나만 따라간다. 새 손가락이 닿으면 그 손가락이 이어받는다.
-  canvas.addEventListener('pointerdown', e => {
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0 };
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (!e.buttons) { drag = null; return; }   // 버튼을 뗀 채 돌아온 포인터(창 전환 등): 드래그를 끝낸다
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    drag.moved += Math.abs(dx) + Math.abs(dy);
-    drag.x = e.clientX;
-    drag.y = e.clientY;
-    yaw -= dx * 0.005;
-    pitch = Math.min(1.2, Math.max(0.05, pitch + dy * 0.004));
-  });
-  canvas.addEventListener('pointerup', e => {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (drag.moved < 6) onClick();
-    drag = null;
-  });
-
-  function update(dt, obstacles, bounds) {
-    const run = stick ? Math.hypot(stick.f, stick.r) >= RUN_TILT : keys.shift;
-    let v = null, speed = run ? RUN : WALK;
-    if (st.auto) { v = { x: Math.sin(st.facing), z: Math.cos(st.facing) }; speed = AUTO_WALK; }
-    else if (dash > 0) { dash -= dt; v = dashDir; speed = DASH; }
-    else v = moveVector(stick ?? keyAxes(), yaw);
-    if (v) {
-      const next = { x: st.x + v.x * speed * dt, z: st.z + v.z * speed * dt };
-      // 엔딩 자동 걷기는 소품을 무시하지만 지역 경계에서는 멈춘다. 더 못 가면 선다.
-      const p = resolve(next, RADIUS, st.auto ? [] : obstacles, bounds);
-      if (st.auto && dist(p, st) < 1e-6) v = null;
-      Object.assign(st, p);
-      if (v && !st.auto && dash <= 0) st.facing = facingOf(v);
-    }
-    st.moving = !!v;
-    if (!anim.busy()) anim.play(!v ? 'Idle' : speed === RUN ? 'Running_A' : 'Walking_A');
-    sync();
-  }
-
-  // 모델과 카메라를 지금 상태에 맞춘다. 순간이동 직후(로딩·페이드 중엔 update가 안 돈다)에도 부른다.
-  function sync() {
-    obj.position.set(st.x, 0, st.z);
-    obj.rotation.y = st.facing;
-    camera.position.set(
-      st.x + Math.sin(yaw) * Math.cos(pitch) * CAM_DIST,
-      1.5 + Math.sin(pitch) * CAM_DIST,
-      st.z + Math.cos(yaw) * Math.cos(pitch) * CAM_DIST,
-    );
-    camera.lookAt(st.x, 1.6, st.z);
-  }
-
-  return {
-    state: st,
-    update,
-    clearKeys,
-    setStick(axes) { stick = axes; },
-    teleport(x, z, facing) {
-      Object.assign(st, { x, z, facing });
-      yaw = facing + Math.PI;
-      sync();
-    },
-    dash() {
-      dash = DASH_TIME;
-      dashDir = moveVector(stick ?? keyAxes(), yaw) ?? { x: Math.sin(st.facing), z: Math.cos(st.facing) };
-      anim.play('Dodge_Forward', { once: true });
-    },
-    set onClick(fn) { onClick = fn; },
-  };
+export function createWalker(x, z, dir = 'up') {
+  return { x, z, dir, facing: DIRS[dir].facing, from: null, to: null, t: 0, speed: 0, wait: 0, moving: false };
 }
+
+function face(w, dir) {
+  w.dir = dir;
+  w.facing = DIRS[dir].facing;
+}
+
+function start(w, dir, speed, blocked) {
+  const d = DIRS[dir], x = w.x + d.dx, z = w.z + d.dz;
+  if (blocked(x, z)) return false;
+  Object.assign(w, { from: { x: w.x, z: w.z }, to: { x, z }, t: 0, speed });
+  return true;
+}
+
+// 입력 { dir, run, auto }로 dt초만큼 움직인다. 칸 사이에 있으면 입력과 상관없이 다음 칸까지는 간다.
+// 칸에 닿았을 때 방향이 눌려 있으면 남은 시간으로 이어서 걷는다(그래서 프레임 길이와 상관없이 같은 거리를 간다).
+export function step(w, { dir = null, run = false, auto = false } = {}, dt, blocked) {
+  let left = dt;
+  while (left > 1e-9) {
+    if (!w.to) {
+      if (!dir) { w.moving = false; w.wait = 0; return w; }
+      if (dir !== w.dir) { face(w, dir); if (!w.moving) w.wait = TURN; }
+      if (w.wait > 0) {
+        const used = Math.min(w.wait, left);
+        w.wait -= used;
+        left -= used;
+        if (w.wait > 1e-9) return w;
+      }
+      if (!start(w, dir, auto ? AUTO : run ? RUN : WALK, blocked)) { w.moving = false; return w; }
+    }
+    const used = Math.min(left, (1 - w.t) / w.speed);
+    w.t += used * w.speed;
+    left -= used;
+    w.moving = true;
+    if (w.t >= 1 - 1e-9) {
+      w.x = w.to.x;
+      w.z = w.to.z;
+      w.to = null;
+    } else {
+      w.x = w.from.x + (w.to.x - w.from.x) * w.t;
+      w.z = w.from.z + (w.to.z - w.from.z) * w.t;
+    }
+  }
+  return w;
+}
+
+// 피하기: 한 칸을 빠르게 간다. 걷던 중이면 지금 칸을 마저 끝낸 자리에서 출발한다. 바라보는 방향은 그대로.
+export function dash(w, dir, blocked) {
+  if (w.to) {
+    w.x = w.to.x;
+    w.z = w.to.z;
+    w.to = null;
+  }
+  return start(w, dir, DASH, blocked);
+}
+
+// 바라보는 앞 칸(말 걸기 판정)
+export const front = w => ({ x: Math.round(w.x) + DIRS[w.dir].dx, z: Math.round(w.z) + DIRS[w.dir].dz });

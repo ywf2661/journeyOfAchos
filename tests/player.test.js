@@ -1,124 +1,76 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createPlayer } from '../src/player.js';
+import { createWalker, step, dash, front, WALK, RUN, TURN } from '../src/player.js';
 
-// player.js는 three를 import하지 않는다. 화면 객체 대신 필요한 메서드만 가진 가짜를 넘기고,
-// window·canvas 이벤트는 등록된 처리기를 직접 불러 흉내 낸다.
-const winHandlers = {};
-globalThis.addEventListener = (type, fn) => (winHandlers[type] ??= []).push(fn);
-const key = (type, code) => winHandlers[type]?.forEach(fn => fn({ code }));
+const open = () => false;
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
-const BOUNDS = { minX: -100, maxX: 100, minZ: -100, maxZ: 100 };
 
-function setup() {
-  const plays = [], canvasHandlers = {};
-  const camera = { at: null, position: { set: (...xyz) => { camera.at = xyz; } }, lookAt() {} };
-  const p = createPlayer(
-    { position: { set() {} }, rotation: {} },
-    { busy: () => false, play: name => plays.push(name) },
-    camera,
-    { addEventListener: (type, fn) => { canvasHandlers[type] = fn; }, setPointerCapture() {} },
-  );
-  const pointer = (type, e) => canvasHandlers[type]({ buttons: 1, clientY: 100, ...e });
-  p.teleport(0, 0, Math.PI);   // -z를 바라보고, 카메라는 +z 뒤에 있다(앞 = -z)
-  return { p, plays, camera, pointer };
-}
-
-test('키보드 W는 앞으로 걷고, Shift를 함께 누르면 달린다', () => {
-  const { p } = setup();
-  key('keydown', 'KeyW');
-  p.update(0.1, [], BOUNDS);
-  near(p.state.z, -0.42);
-  key('keydown', 'ShiftLeft');
-  p.update(0.1, [], BOUNDS);
-  near(p.state.z, -1.17);
-  key('keyup', 'KeyW');
-  key('keyup', 'ShiftLeft');
-  p.update(0.1, [], BOUNDS);
-  assert.equal(p.state.moving, false);
+test('방향키를 누르고 있으면 한 칸에 1/WALK초씩 이어 걷는다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up' }, 1 / WALK, open);
+  assert.deepEqual([w.x, w.z, w.moving], [0, -1, true]);
+  step(w, { dir: 'up' }, 1 / WALK, open);
+  assert.deepEqual([w.x, w.z], [0, -2]);
 });
 
-test('엔딩 자동 걷기는 지역 경계에서 멈추고, 멈추면 선다', () => {
-  const { p, plays } = setup();
-  const bounds = { minX: -14, maxX: 14, minZ: -90, maxZ: 18 };
-  p.teleport(0, 10, Math.PI);
-  p.state.auto = true;
-  p.update(0.1, [], bounds);
-  assert.equal(p.state.moving, true);
-  assert.equal(plays.at(-1), 'Walking_A');
-  for (let i = 0; i < 2000; i++) p.update(0.1, [], bounds);   // 200초: 1.3/초로 걸으면 경계를 훨씬 지난다
-  assert.equal(p.state.z, -90);
-  assert.equal(p.state.moving, false);
-  assert.equal(plays.at(-1), 'Idle');
+test('칸 중간에서 손을 떼도 다음 칸까지는 가서 선다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up' }, 0.1, open);
+  near(w.z, -0.4);
+  step(w, { dir: null }, 0.5, open);
+  assert.deepEqual([w.x, w.z, w.moving], [0, -1, false]);
 });
 
-test('조이스틱을 조금 기울이면 걷고, 끝까지 기울이면 달린다', () => {
-  const { p } = setup();
-  p.setStick({ f: 0.5, r: 0 });
-  p.update(0.1, [], BOUNDS);
-  near(p.state.z, -0.42);
-  p.setStick({ f: 1, r: 0 });
-  p.update(0.1, [], BOUNDS);
-  near(p.state.z, -1.17);
+test('선 자리에서 다른 방향을 짧게 누르면 돌아서기만 한다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'left' }, TURN / 2, open);
+  step(w, { dir: null }, 0.5, open);
+  assert.deepEqual([w.x, w.z, w.dir], [0, 0, 'left']);
+  near(w.facing, -Math.PI / 2);
 });
 
-test('조이스틱이 데드존 안이거나 놓이면 멈춘다', () => {
-  const { p } = setup();
-  p.setStick({ f: 0.1, r: 0 });
-  p.update(0.1, [], BOUNDS);
-  assert.equal(p.state.moving, false);
-  p.setStick(null);
-  p.update(0.1, [], BOUNDS);
-  assert.equal(p.state.moving, false);
-  assert.equal(p.state.z, 0);
+test('다른 방향을 길게 누르면 돌아선 뒤 걷는다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'right' }, TURN + 1 / WALK, open);
+  assert.deepEqual([w.x, w.z], [1, 0]);
 });
 
-test('조이스틱이 키보드보다 먼저다', () => {
-  const { p } = setup();
-  key('keydown', 'KeyW');
-  p.setStick({ f: -0.5, r: 0 });
-  p.update(0.1, [], BOUNDS);
-  near(p.state.z, 0.42);
-  key('keyup', 'KeyW');
+test('걷던 중에 방향을 바꾸면 기다리지 않고 꺾는다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up' }, 1 / WALK, open);
+  step(w, { dir: 'right' }, 1 / WALK, open);
+  assert.deepEqual([w.x, w.z], [1, -1]);
 });
 
-test('clearKeys(대화가 열릴 때)는 조이스틱도 놓는다', () => {
-  const { p } = setup();
-  p.setStick({ f: 0.5, r: 0 });
-  p.clearKeys();
-  p.update(0.1, [], BOUNDS);
-  assert.equal(p.state.moving, false);
+test('막힌 칸으로는 못 가고 방향만 바뀐다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'down' }, 1, (x, z) => x === 0 && z === 1);
+  assert.deepEqual([w.x, w.z, w.dir, w.moving], [0, 0, 'down', false]);
 });
 
-test('다른 손가락의 움직임은 시야 드래그에 끼어들지 않는다', () => {
-  const { p, camera, pointer } = setup();
-  const before = [...camera.at];
-  pointer('pointerdown', { pointerId: 1, clientX: 100 });
-  pointer('pointermove', { pointerId: 2, clientX: 400 });
-  p.update(0.1, [], BOUNDS);
-  assert.deepEqual(camera.at, before);
-  pointer('pointermove', { pointerId: 1, clientX: 200 });
-  p.update(0.1, [], BOUNDS);
-  assert.notDeepEqual(camera.at, before);
+test('X를 누르고 있으면 RUN 속도로 달린다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up', run: true }, 1 / WALK, open);
+  assert.deepEqual([w.x, w.z], [0, -RUN / WALK]);
 });
 
-test('버튼을 뗀 채 들어온 움직임은 드래그를 끝낸다', () => {
-  const { p, camera, pointer } = setup();
-  const before = [...camera.at];
-  pointer('pointerdown', { pointerId: 1, clientX: 100 });
-  pointer('pointermove', { pointerId: 1, clientX: 300, buttons: 0 });
-  pointer('pointermove', { pointerId: 1, clientX: 500 });
-  p.update(0.1, [], BOUNDS);
-  assert.deepEqual(camera.at, before);
+test('피하기는 한 칸을 빠르게 가고, 바라보는 방향은 그대로다', () => {
+  const w = createWalker(0, 0, 'up');
+  assert.equal(dash(w, 'down', open), true);
+  step(w, {}, 0.1, open);
+  assert.deepEqual([w.x, w.z, w.dir], [0, 1, 'up']);
+  assert.equal(dash(w, 'down', () => true), false);
 });
 
-test('짧은 탭은 클릭으로 처리하고, 다른 손가락의 손 떼기는 무시한다', () => {
-  const { p, pointer } = setup();
-  let clicks = 0;
-  p.onClick = () => { clicks += 1; };
-  pointer('pointerdown', { pointerId: 1, clientX: 100 });
-  pointer('pointerup', { pointerId: 2, clientX: 100 });
-  assert.equal(clicks, 0);
-  pointer('pointerup', { pointerId: 1, clientX: 100 });
-  assert.equal(clicks, 1);
+test('걷는 중에 피하면 지금 칸을 마저 끝내고 바로 한 칸 더 간다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up' }, 0.1, open);
+  assert.equal(dash(w, 'left', open), true);
+  step(w, {}, 0.1, open);
+  assert.deepEqual([w.x, w.z], [-1, -1]);
+});
+
+test('front는 바라보는 앞 칸', () => {
+  assert.deepEqual(front(createWalker(3, 4, 'left')), { x: 2, z: 4 });
+  assert.deepEqual(front(createWalker(3, 4, 'down')), { x: 3, z: 5 });
 });
