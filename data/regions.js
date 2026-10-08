@@ -74,7 +74,7 @@ export const REGIONS = {
     light: { 1: 'dusk', 2: 'day', 3: 'night' },
     ground: '#3d4a36',
     bounds: { minX: -28, maxX: 28, minZ: -32, maxZ: 30 },
-    start: { x: 0, z: 26, rot: PI },
+    start: { x: 0, z: 10, rot: PI },   // 경보(r2_alarm, 입구 z 22)와 떨어뜨린다 — 이어하기가 여기서 시작한다
     props: [
       { m: 'mountain_a', x: -40, z: -10 },
       { m: 'mountain_b', x: 40, z: -6 },
@@ -104,7 +104,7 @@ export const REGIONS = {
       { m: 'mage', x: 0, z: -16, rot: 0, day: 3 },
     ],
     triggers: [
-      { id: 'r2_arrive', node: 'r2_arrive', x: 0, z: 26, r: 4, auto: true, day: 1 },
+      { id: 'r2_arrive', node: 'r2_arrive', x: 0, z: 10, r: 4, auto: true, day: 1 },
       { id: 'r2_meet', node: 'r2_meet', x: 0, z: -16, r: 3, day: 1, ends: true, label: '탑 앞의 여인에게 말을 건다' },
       { id: 'r2_d2_talk', node: 'r2_d2_talk', x: -16, z: -6, r: 3, day: 2, label: '마술사에게 말을 건다' },
       { id: 'r2_mem_falls', node: 'r2_mem_falls', x: -20, z: -10, r: 3, day: 2, if: 'done:r2_d2_talk', label: '멈춘 폭포 아래를 걷는다' },

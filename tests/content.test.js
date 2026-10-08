@@ -5,6 +5,7 @@ import { REGIONS, FIGHTS } from '../data/regions.js';
 import { MODELS } from '../data/models.js';
 import { createState, createDialogue, applyEffect, winFight, markDone } from '../src/story.js';
 import { triggersFor } from '../src/region.js';
+import { dist } from '../src/geom.js';
 
 const triggers = Object.values(REGIONS).flatMap(r => r.triggers);
 const EFFECT = /^(nextDay|ending|region:[123]|combat:(\w+))$/;
@@ -123,4 +124,12 @@ function endingLines(memories) {
 test('엔딩 회상에는 모은 기억 조각만 나온다', () => {
   assert.equal(endingLines(Object.keys(MEMORIES)) - endingLines([]), 5);
   assert.equal(endingLines(['mem_stars']) - endingLines([]), 1);
+});
+
+// 이어하기는 늘 지역 시작점에서 다시 시작한다. 조건이 붙은 자동 트리거가 시작점을 덮으면
+// 이어하자마자 (되돌릴 수 없는) 장면이 터져 그날의 기억 조각을 놓친다.
+test('이어하기 시작점이 조건부 자동 트리거 안에 있지 않다', () => {
+  for (const r of Object.values(REGIONS)) {
+    for (const t of r.triggers) if (t.auto && t.if) assert.ok(dist(r.start, t) > t.r, `${r.name}: ${t.id}`);
+  }
 });

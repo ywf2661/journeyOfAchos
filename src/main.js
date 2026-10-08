@@ -199,9 +199,9 @@ function loseFight() {
   setTimeout(() => startFight(id).catch(fail), 1800);
 }
 
-// 엔딩: 저장을 지우고, 둘이 지평선(-z) 쪽으로 천천히 걷는 동안 회상 대사를 띄운다.
+// 엔딩: 둘이 지평선(-z) 쪽으로 천천히 걷는 동안 회상 대사를 띄운다.
+// 저장은 끝 화면에서 지운다 — 회상 도중 새로고침하면 다리에서 엔딩을 다시 볼 수 있다.
 function startEnding() {
-  clearSave(storage);
   ending = { aion: world.actors.find(a => a.def.m === 'mage') };
   player.teleport(player.state.x, player.state.z, Math.PI);
   player.state.auto = true;
@@ -211,12 +211,14 @@ function startEnding() {
 
 function followAion() {
   if (!ending.aion) return;
+  ending.aion.anim.play(player.state.moving ? 'Walking_A' : 'Idle');
   ending.aion.obj.position.set(player.state.x + 1.6, 0, player.state.z + 0.6);
   ending.aion.obj.rotation.y = Math.PI;
 }
 
 async function finish() {
   mode = 'end';
+  clearSave(storage);
   await ui.fade(true);
   await ui.showEnd(state.memories.length, Object.keys(MEMORIES).length);
   location.reload();
