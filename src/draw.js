@@ -5,6 +5,14 @@ const T = 16, VIEW = 12;   // 타일 크기(px), 화면 짧은 쪽에 보이는 
 // 지역 분위기: 화면 전체에 덧씌우는 색과 진하기
 const LIGHT = { night: ['#0a1030', 0.55], dusk: ['#4a2040', 0.3], day: null, dawn: ['#ff9a60', 0.15] };
 
+// 그릴 크기(게임 화소 W×H)와 화면에 보일 CSS 크기. 게임 화소 하나를 기기 화소 k개(정수)로 키워 도트가 고르게 보인다.
+// k는 짧은 쪽에 VIEW칸 가까이 들어가게 반올림한다(휴대폰 360px 폭 × 3배 화면이면 6 → 11.25칸).
+export function viewSize(cssW, cssH, dpr = 1) {
+  const k = Math.max(1, Math.round((Math.min(cssW, cssH) * dpr) / (VIEW * T)));
+  const W = Math.ceil((cssW * dpr) / k), H = Math.ceil((cssH * dpr) / k);
+  return { W, H, cssW: (W * k) / dpr, cssH: (H * k) / dpr };
+}
+
 export function loadSheets() {
   const out = {};
   return Promise.all(Object.entries(SHEETS).map(([k, s]) => new Promise((ok, bad) => {
@@ -21,15 +29,14 @@ export function createRenderer(canvas, sheets) {
   const tinted = new Map();
   let W = 0, H = 0;
 
-  // 정수 배율로 키운다: 짧은 쪽에 VIEW칸이 들어가는 가장 큰 배율. 남는 쪽은 조금 더 보인다.
   function resize() {
-    const scale = Math.max(1, Math.floor(Math.min(innerWidth, innerHeight) / (VIEW * T)));
-    W = Math.ceil(innerWidth / scale);
-    H = Math.ceil(innerHeight / scale);
+    const v = viewSize(innerWidth, innerHeight, devicePixelRatio || 1);
+    W = v.W;
+    H = v.H;
     canvas.width = shade.width = W;
     canvas.height = shade.height = H;
-    canvas.style.width = `${W * scale}px`;
-    canvas.style.height = `${H * scale}px`;
+    canvas.style.width = `${v.cssW}px`;
+    canvas.style.height = `${v.cssH}px`;
     ctx.imageSmoothingEnabled = false;
   }
   addEventListener('resize', resize);
