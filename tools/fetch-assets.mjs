@@ -2,7 +2,8 @@
 // 저장소 루트에서 실행: npm run fetch-assets  (이미 있는 파일은 다시 받지 않는다)
 import { mkdir, writeFile, readFile, access } from 'node:fs/promises';
 import { posix } from 'node:path';
-import { MODELS } from '../data/models.js';
+import { MODELS, ANIMATIONS } from '../data/models.js';
+import { slimGlb } from './slim-anims.mjs';
 
 const RAW = 'https://raw.githubusercontent.com/KayKit-Game-Assets/';
 const PACKS = {
@@ -27,6 +28,7 @@ async function fetchOne(local) {
     const res = await fetch(PACKS[prefix] + local.slice(prefix.length));
     if (!res.ok) throw new Error(`${res.status} ${local}`);
     body = Buffer.from(await res.arrayBuffer());
+    if (local.endsWith('.glb')) body = slimGlb(body, ANIMATIONS);   // 캐릭터: 게임이 쓰는 애니메이션만 남긴다
     await mkdir(posix.dirname(local), { recursive: true });
     await writeFile(local, body);
     console.log('받음', local);

@@ -43,3 +43,11 @@ export const MODELS = {
   fence: { url: HAL + 'fence.gltf', scale: 1 },
   bed: { url: FUR + 'bed_single_A.gltf', scale: 1 },
 };
+
+
+// 게임이 쓰는 애니메이션. tools/slim-anims.mjs가 캐릭터 GLB에서 이것만 남긴다(테스트가 코드와 맞는지 확인한다).
+export const ANIMATIONS = [
+  'Idle', 'Walking_A', 'Running_A', 'Dodge_Forward',
+  '1H_Melee_Attack_Slice_Horizontal', '1H_Melee_Attack_Chop',
+  'Hit_A', 'Death_A', 'Lie_Idle', 'Sit_Floor_Idle',
+];
