@@ -51,3 +51,74 @@ test('엔딩 자동 걷기는 지역 경계에서 멈추고, 멈추면 선다', 
   assert.equal(p.state.moving, false);
   assert.equal(plays.at(-1), 'Idle');
 });
+
+test('조이스틱을 조금 기울이면 걷고, 끝까지 기울이면 달린다', () => {
+  const { p } = setup();
+  p.setStick({ f: 0.5, r: 0 });
+  p.update(0.1, [], BOUNDS);
+  near(p.state.z, -0.42);
+  p.setStick({ f: 1, r: 0 });
+  p.update(0.1, [], BOUNDS);
+  near(p.state.z, -1.17);
+});
+
+test('조이스틱이 데드존 안이거나 놓이면 멈춘다', () => {
+  const { p } = setup();
+  p.setStick({ f: 0.1, r: 0 });
+  p.update(0.1, [], BOUNDS);
+  assert.equal(p.state.moving, false);
+  p.setStick(null);
+  p.update(0.1, [], BOUNDS);
+  assert.equal(p.state.moving, false);
+  assert.equal(p.state.z, 0);
+});
+
+test('조이스틱이 키보드보다 먼저다', () => {
+  const { p } = setup();
+  key('keydown', 'KeyW');
+  p.setStick({ f: -0.5, r: 0 });
+  p.update(0.1, [], BOUNDS);
+  near(p.state.z, 0.42);
+  key('keyup', 'KeyW');
+});
+
+test('clearKeys(대화가 열릴 때)는 조이스틱도 놓는다', () => {
+  const { p } = setup();
+  p.setStick({ f: 0.5, r: 0 });
+  p.clearKeys();
+  p.update(0.1, [], BOUNDS);
+  assert.equal(p.state.moving, false);
+});
+
+test('다른 손가락의 움직임은 시야 드래그에 끼어들지 않는다', () => {
+  const { p, camera, pointer } = setup();
+  const before = [...camera.at];
+  pointer('pointerdown', { pointerId: 1, clientX: 100 });
+  pointer('pointermove', { pointerId: 2, clientX: 400 });
+  p.update(0.1, [], BOUNDS);
+  assert.deepEqual(camera.at, before);
+  pointer('pointermove', { pointerId: 1, clientX: 200 });
+  p.update(0.1, [], BOUNDS);
+  assert.notDeepEqual(camera.at, before);
+});
+
+test('버튼을 뗀 채 들어온 움직임은 드래그를 끝낸다', () => {
+  const { p, camera, pointer } = setup();
+  const before = [...camera.at];
+  pointer('pointerdown', { pointerId: 1, clientX: 100 });
+  pointer('pointermove', { pointerId: 1, clientX: 300, buttons: 0 });
+  pointer('pointermove', { pointerId: 1, clientX: 500 });
+  p.update(0.1, [], BOUNDS);
+  assert.deepEqual(camera.at, before);
+});
+
+test('짧은 탭은 클릭으로 처리하고, 다른 손가락의 손 떼기는 무시한다', () => {
+  const { p, pointer } = setup();
+  let clicks = 0;
+  p.onClick = () => { clicks += 1; };
+  pointer('pointerdown', { pointerId: 1, clientX: 100 });
+  pointer('pointerup', { pointerId: 2, clientX: 100 });
+  assert.equal(clicks, 0);
+  pointer('pointerup', { pointerId: 1, clientX: 100 });
+  assert.equal(clicks, 1);
+});
