@@ -1,13 +1,120 @@
-// DOM 오버레이(임시). Task 8에서 대화창·타이틀 등이 더해진다.
+// DOM 오버레이: 대화창, 프롬프트, 토스트, HUD, 페이드, 타이틀/엔딩 화면, 오류, 시계 소리.
 const $ = id => document.getElementById(id);
+let typing = null;
+
+export function showPrompt(text) {
+  $('prompt').textContent = text ?? '';
+  $('prompt').hidden = !text;
+}
+
+// 글자를 한 자씩 보여 주고, 다 나오면 선택지 버튼을 붙인다.
+export function showLine(view, speaker, onChoose) {
+  const textEl = $('text'), choicesEl = $('choices');
+  $('dialog').hidden = false;
+  $('who').textContent = speaker;
+  $('who').hidden = !speaker;
+  textEl.classList.toggle('narration', !speaker);
+  textEl.textContent = '';
+  choicesEl.replaceChildren();
+  if (typing) clearInterval(typing.id);
+  const chars = [...view.text];
+  let i = 0;
+  function finish() {
+    clearInterval(typing.id);
+    typing = null;
+    textEl.textContent = view.text;
+    (view.choices ?? []).forEach((c, idx) => {
+      const b = document.createElement('button');
+      b.textContent = `${idx + 1}. ${c}`;
+      b.onclick = e => { e.stopPropagation(); onChoose(idx); };
+      choicesEl.append(b);
+    });
+  }
+  typing = { id: setInterval(() => { textEl.textContent += chars[i++] ?? ''; if (i >= chars.length) finish(); }, 28), finish };
+  if (!chars.length) finish();
+}
+
+export function completeTyping() {
+  if (!typing) return false;
+  typing.finish();
+  return true;
+}
+
+export function hideDialog() {
+  if (typing) clearInterval(typing.id);
+  typing = null;
+  $('dialog').hidden = true;
+}
+
+export function onDialogClick(cb) {
+  $('dialog').addEventListener('click', e => { if (!e.target.closest('button')) cb(); });
+}
+
+let toastTimer;
+export function toast(text) {
+  const el = $('toast');
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
+}
+
+export function showHud(hp, max, timeLeft) {
+  const h = Math.max(0, hp);
+  $('hud').hidden = false;
+  $('hearts').textContent = '♥'.repeat(h) + '♡'.repeat(max - h);
+  $('timer').textContent = timeLeft == null ? '' : `멈춘 시간 ${Math.max(0, Math.ceil(timeLeft))}초`;
+}
+
+export function hideHud() { $('hud').hidden = true; }
+
+export function setFrozenLook(on) {
+  $('game').style.filter = on ? 'grayscale(0.85) sepia(0.25) hue-rotate(220deg) brightness(0.9)' : '';
+}
 
 export function fade(on) {
   $('fade').classList.toggle('on', on);
   return new Promise(r => setTimeout(r, 650));
 }
 
+export function showTitle(canContinue) {
+  $('title').hidden = false;
+  $('btn-continue').hidden = !canContinue;
+  (canContinue ? $('btn-continue') : $('btn-new')).focus();
+  return new Promise(resolve => {
+    const pick = choice => () => { $('title').hidden = true; resolve(choice); };
+    $('btn-continue').onclick = pick('continue');
+    $('btn-new').onclick = pick('new');
+  });
+}
+
+export function showEnd(found, total) {
+  $('end-memories').textContent = `모은 기억 조각 ${found} / ${total}`;
+  $('end').hidden = false;
+  return new Promise(resolve => { $('btn-restart').onclick = resolve; });
+}
+
 export function showError(msg) {
   const el = $('error');
   el.textContent = `문제가 생겼습니다.\n\n${msg}\n\n새로고침해서 다시 시도해 주세요.`;
   el.hidden = false;
+}
+
+let audio;
+// 시계 째깍 소리: 짧은 사각파 두 번을 합성한다. 브라우저가 소리를 막으면 조용히 넘어간다.
+export function tick() {
+  try {
+    audio ??= new AudioContext();
+    const t = audio.currentTime;
+    for (const [dt, freq] of [[0, 1800], [0.09, 1400]]) {
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.05, t + dt);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.04);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t + dt);
+      osc.stop(t + dt + 0.05);
+    }
+  } catch { /* 소리 없이 진행한다 */ }
 }
