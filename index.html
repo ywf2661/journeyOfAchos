@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Journey of Achos — 아코스의 여정</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,7 @@
   #text.narration { color: #c8c0d8; font-style: italic; }
   #choices { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.8rem; }
   #choices button { text-align: left; min-width: 0; }
-  #prompt { position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 0.4rem 1rem; }
+  #prompt { position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 0.4rem 1rem; min-width: 0; min-height: 44px; }
   #toast { position: fixed; top: 4vh; right: 3vw; background: var(--panel); border-left: 3px solid #a98be0; padding: 0.7rem 1.1rem; }
   #hud { position: fixed; top: 3vh; left: 3vw; font-size: 1.4rem; letter-spacing: 0.2em; color: #e07a6a; }
   #timer { color: #c8b0f0; font-size: 1rem; letter-spacing: 0; margin-left: 1rem; }
@@ -46,7 +46,7 @@
 <body>
 <canvas id="game"></canvas>
 <div id="hud" hidden><span id="hearts"></span><span id="timer"></span></div>
-<div id="prompt" hidden></div>
+<button id="prompt" hidden></button>
 <div id="toast" hidden></div>
 <div id="dialog" hidden><div id="who"></div><div id="text"></div><div id="choices"></div></div>
 <div id="fade" class="on"></div>

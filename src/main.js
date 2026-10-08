@@ -11,18 +11,23 @@ import { createPlayer } from './player.js';
 import * as ui from './ui.js';
 
 const canvas = document.getElementById('game');
+// 주로 터치로 조작하는 기기(휴대폰·태블릿). 부팅 때 한 번 정한다.
+const TOUCH = matchMedia('(pointer: coarse)').matches;
+document.body.classList.toggle('touch', TOUCH);
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); }
 catch (e) { ui.showError('이 브라우저에서 WebGL을 쓸 수 없습니다.'); throw e; }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// 휴대폰은 화면 배율이 높아(보통 3) 그대로 그리면 무겁다. 해상도와 그림자를 낮춘다.
+renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = TOUCH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
 function resize() {
   renderer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
+  camera.fov = innerHeight > innerWidth ? 70 : 55;   // 세로 화면은 시야를 넓혀 아코스가 화면을 덜 가리게
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
@@ -48,7 +53,7 @@ async function enterRegion() {
   ui.showPrompt(null);
   await ui.fade(true);
   if (world) scene.remove(world.root);
-  world = await buildRegion(scene, region(), state);
+  world = await buildRegion(scene, region(), state, { shadowSize: TOUCH ? 1024 : 2048 });
   if (!player) {
     const obj = await spawn('knight');
     hero = animate(obj);
@@ -76,7 +81,7 @@ function nearestTrigger() {
 function checkTriggers() {
   const t = nearestTrigger();
   if (t?.auto) return openDialogue(t.node, t);
-  ui.showPrompt(t ? `[E] ${t.label}${t.ends ? ' (되돌릴 수 없음)' : ''}` : null);
+  ui.showPrompt(t ? `${TOUCH ? '' : '[E] '}${t.label}${t.ends ? ' (되돌릴 수 없음)' : ''}` : null);
 }
 
 function openDialogue(nodeId, trigger) {
@@ -224,6 +229,17 @@ async function finish() {
   location.reload();
 }
 
+// 키보드와 화면 버튼(말 걸기 안내, 터치 전투 버튼)이 함께 부르는 동작
+function interact() {
+  if (mode !== 'explore') return;
+  const t = nearestTrigger();
+  if (t && !t.auto) openDialogue(t.node, t);
+}
+
+function dodgeAction() {
+  if (mode === 'combat' && dodge(fight)) player.dash();
+}
+
 const ADVANCE_KEYS = ['Space', 'KeyE', 'Enter', 'NumpadEnter'];
 addEventListener('keydown', e => {
   if (e.repeat) return;
@@ -231,18 +247,16 @@ addEventListener('keydown', e => {
     if (ADVANCE_KEYS.includes(e.code)) advance();
     const n = Number(e.code.match(/^Digit([1-9])$/)?.[1]);
     if (n && view?.choices && !ui.completeTyping() && n <= view.choices.length) show(dialogue.choose(n - 1));
-  } else if (mode === 'explore' && e.code === 'KeyE') {
-    const t = nearestTrigger();
-    if (t && !t.auto) openDialogue(t.node, t);
-  } else if (mode === 'combat' && e.code === 'Space' && dodge(fight)) {
-    player.dash();
-  }
+  } else if (e.code === 'KeyE') interact();
+  else if (e.code === 'Space') dodgeAction();
 });
 ui.onDialogClick(() => { if (mode === 'dialogue') advance(); });
+ui.onPromptClick(interact);
 
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
+  document.body.dataset.mode = mode;   // 터치 조작이 보일지는 CSS(body.touch[data-mode])가 정한다
   world?.update(dt, t);
   hero?.mixer.update(dt);
   for (const e of dying) e.anim.mixer.update(dt);
@@ -259,6 +273,9 @@ async function boot() {
   const saved = loadGame(storage);
   state = (await ui.showTitle(!!saved)) === 'continue' ? saved : createState();
   if (state.pendingFight && !FIGHTS[state.pendingFight]) state.pendingFight = null;
+  // 대본의 조작 안내가 이 플래그로 갈린다. 저장에 남아 있어도 이번 기기에 맞춰 다시 정한다.
+  state.flags = state.flags.filter(f => f !== 'touch');
+  if (TOUCH) state.flags.push('touch');
   await enterRegion();
 }
 boot().catch(fail);

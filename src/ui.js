@@ -50,6 +50,10 @@ export function onDialogClick(cb) {
   $('dialog').addEventListener('click', e => { if (!e.target.closest('button')) cb(); });
 }
 
+export function onPromptClick(cb) {
+  $('prompt').addEventListener('click', cb);
+}
+
 let toastTimer;
 export function toast(text) {
   const el = $('toast');
@@ -101,6 +105,15 @@ export function showError(msg) {
 }
 
 let audio;
+// 아이폰은 사용자 동작(탭·클릭·키) 안에서 소리 장치를 깨워야 소리가 난다. 이미 깨어 있으면 아무것도 안 한다.
+function wakeAudio() {
+  try {
+    audio ??= new AudioContext();
+    if (audio.state !== 'running') audio.resume().catch(() => {});
+  } catch { /* 소리 없이 진행한다 */ }
+}
+for (const type of ['click', 'touchend', 'keydown']) addEventListener(type, wakeAudio);
+
 // 시계 째깍 소리: 짧은 사각파 두 번을 합성한다. 브라우저가 소리를 막으면 조용히 넘어간다.
 export function tick() {
   try {

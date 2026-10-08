@@ -83,7 +83,7 @@ const LIGHTS = {
 
 // ponytail: 지역을 바꿀 때 코드로 만든 지오메트리를 dispose하지 않는다. 한 판에 지역 로드가 5번 남짓이라 괜찮다.
 // 오래 켜 두는 구조로 바뀌면 root.traverse로 geometry·material을 dispose한다.
-export async function buildRegion(scene, region, state) {
+export async function buildRegion(scene, region, state, { shadowSize = 2048 } = {}) {
   const root = new THREE.Group();
   const L = LIGHTS[lightFor(region, state)];
   scene.background = new THREE.Color(L.sky);
@@ -92,7 +92,7 @@ export async function buildRegion(scene, region, state) {
   const sun = new THREE.DirectionalLight(L.sun[0], L.sun[1]);
   sun.position.set(...L.sun[2]);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
   Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, far: 200 });
   root.add(sun);
 
