@@ -4,22 +4,24 @@ import { moveVector, facingOf, dist, resolve, inArc, circlesAlong } from '../src
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
 
-test('카메라가 +z 뒤에 있을 때(yaw 0) W는 -z, D는 +x', () => {
-  const w = moveVector({ w: true }, 0);
+test('카메라가 +z 뒤에 있을 때(yaw 0) 앞(f=1)은 -z, 오른쪽(r=1)은 +x', () => {
+  const w = moveVector({ f: 1, r: 0 }, 0);
   near(w.x, 0); near(w.z, -1);
-  const d = moveVector({ d: true }, 0);
+  const d = moveVector({ f: 0, r: 1 }, 0);
   near(d.x, 1); near(d.z, 0);
 });
 
-test('대각선 이동도 길이가 1이고, 키가 없으면 null', () => {
-  const v = moveVector({ w: true, d: true }, 0);
+test('기울기가 얼마든 방향은 길이 1이고, 데드존 안이면 null', () => {
+  const v = moveVector({ f: 1, r: 1 }, 0);
   near(Math.hypot(v.x, v.z), 1);
-  assert.equal(moveVector({}, 0), null);
-  assert.equal(moveVector({ w: true, s: true }, 0), null);
+  const half = moveVector({ f: 0.3, r: 0 }, 0);
+  near(half.x, 0); near(half.z, -1);
+  assert.equal(moveVector({ f: 0, r: 0 }, 0), null);
+  assert.equal(moveVector({ f: 0.1, r: 0.05 }, 0), null);
 });
 
 test('카메라를 돌리면 이동 방향도 돈다', () => {
-  const v = moveVector({ w: true }, Math.PI / 2);
+  const v = moveVector({ f: 1, r: 0 }, Math.PI / 2);
   near(v.x, -1); near(v.z, 0);
 });
 

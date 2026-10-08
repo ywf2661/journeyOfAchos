@@ -1,10 +1,11 @@
 // 순수 기하: x,z 평면만 다룬다. 방향각 θ의 앞쪽은 (sin θ, cos θ)이다(Three.js rotation.y와 같은 규약).
 
-// 카메라는 (sin yaw, cos yaw) 쪽 뒤에서 플레이어를 본다. 화면 기준 WASD를 월드 방향으로 바꾼다.
-export function moveVector(keys, camYaw) {
-  const f = (keys.w ? 1 : 0) - (keys.s ? 1 : 0);
-  const r = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
-  if (!f && !r) return null;
+export const DEADZONE = 0.15;   // 이보다 덜 기울이면 멈춘 것으로 본다(조이스틱에 손가락만 닿은 경우)
+
+// 화면 기준 기울기(f: 앞+/뒤−, r: 오른쪽+/왼쪽−, 각 −1~1)를 월드 방향(길이 1)으로 바꾼다.
+// 카메라는 (sin yaw, cos yaw) 쪽 뒤에서 플레이어를 본다. 키보드와 조이스틱이 함께 쓴다.
+export function moveVector({ f, r }, camYaw) {
+  if (Math.hypot(f, r) < DEADZONE) return null;
   const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw);
   const x = fx * f - fz * r, z = fz * f + fx * r;
   const len = Math.hypot(x, z);

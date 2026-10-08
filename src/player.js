@@ -14,6 +14,7 @@ export function createPlayer(obj, anim, camera, canvas) {
   const st = { x: 0, z: 0, facing: 0, auto: false, moving: false };
   let yaw = 0, pitch = 0.32, dash = 0, dashDir = null, drag = null, onClick = () => {};
 
+  const keyAxes = () => ({ f: (keys.w ? 1 : 0) - (keys.s ? 1 : 0), r: (keys.d ? 1 : 0) - (keys.a ? 1 : 0) });
   const clearKeys = () => { for (const k in keys) keys[k] = false; };
   addEventListener('keydown', e => { if (CODES[e.code]) keys[CODES[e.code]] = true; });
   addEventListener('keyup', e => { if (CODES[e.code]) keys[CODES[e.code]] = false; });
@@ -41,7 +42,7 @@ export function createPlayer(obj, anim, camera, canvas) {
     let v = null, speed = keys.shift ? RUN : WALK;
     if (st.auto) { v = { x: Math.sin(st.facing), z: Math.cos(st.facing) }; speed = AUTO_WALK; }
     else if (dash > 0) { dash -= dt; v = dashDir; speed = DASH; }
-    else v = moveVector(keys, yaw);
+    else v = moveVector(keyAxes(), yaw);
     if (v) {
       const next = { x: st.x + v.x * speed * dt, z: st.z + v.z * speed * dt };
       // 엔딩 자동 걷기는 소품을 무시하지만 지역 경계에서는 멈춘다. 더 못 가면 선다.
@@ -78,7 +79,7 @@ export function createPlayer(obj, anim, camera, canvas) {
     },
     dash() {
       dash = DASH_TIME;
-      dashDir = moveVector(keys, yaw) ?? { x: Math.sin(st.facing), z: Math.cos(st.facing) };
+      dashDir = moveVector(keyAxes(), yaw) ?? { x: Math.sin(st.facing), z: Math.cos(st.facing) };
       anim.play('Dodge_Forward', { once: true });
     },
     set onClick(fn) { onClick = fn; },
