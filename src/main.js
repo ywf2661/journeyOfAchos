@@ -8,6 +8,7 @@ import { dist } from './geom.js';
 import { buildRegion, spawn, animate, plagueLook } from './world.js';
 import { createFight, update as updateFight, swing, dodge, PLAYER_MAX_HP } from './combat.js';
 import { createPlayer } from './player.js';
+import { createTouchControls } from './touch.js';
 import * as ui from './ui.js';
 
 const canvas = document.getElementById('game');
@@ -252,6 +253,7 @@ addEventListener('keydown', e => {
 });
 ui.onDialogClick(() => { if (mode === 'dialogue') advance(); });
 ui.onPromptClick(interact);
+if (TOUCH) createTouchControls({ onStick: axes => player?.setStick(axes), onAttack: attack, onDodge: dodgeAction });
 
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
