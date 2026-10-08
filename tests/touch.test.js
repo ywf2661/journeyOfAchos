@@ -14,14 +14,13 @@ function element() {
     setPointerCapture() {},
   };
 }
-const els = { 'stick-zone': element(), stick: element(), 'stick-knob': element(), 'btn-attack': element(), 'btn-dodge': element() };
+const els = { 'stick-zone': element(), stick: element(), 'stick-knob': element(), 'btn-z': element(), 'btn-x': element() };
 globalThis.document = { getElementById: id => els[id] };
 
-const calls = { stick: [], attack: 0, dodge: 0 };
+const calls = { stick: [], buttons: [] };
 createTouchControls({
   onStick: axes => calls.stick.push(axes),
-  onAttack: () => { calls.attack += 1; },
-  onDodge: () => { calls.dodge += 1; },
+  onButton: (b, down) => calls.buttons.push([b, down]),
 });
 
 const zone = els['stick-zone'].h;
@@ -79,9 +78,10 @@ test('손을 떼면 조이스틱이 기본 자리로 돌아간다', () => {
   assert.equal(els['stick-knob'].style.transform, '');
 });
 
-test('전투 버튼은 누르는 순간 동작한다', () => {
-  els['btn-attack'].h.pointerdown({ preventDefault() {} });
-  els['btn-dodge'].h.pointerdown({ preventDefault() {} });
-  assert.equal(calls.attack, 1);
-  assert.equal(calls.dodge, 1);
+test('Z·X 버튼은 누를 때와 뗄 때를 알린다(길게 누르기)', () => {
+  els['btn-z'].h.pointerdown({ preventDefault() {}, pointerId: 5 });
+  els['btn-z'].h.pointerup({ pointerId: 5 });
+  els['btn-x'].h.pointerdown({ preventDefault() {}, pointerId: 6 });
+  els['btn-x'].h.pointercancel({ pointerId: 6 });
+  assert.deepEqual(calls.buttons, [['z', true], ['z', false], ['x', true], ['x', false]]);
 });

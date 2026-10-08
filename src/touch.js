@@ -1,8 +1,8 @@
-// 터치 조작: 화면 왼쪽 절반의 떠다니는 조이스틱과 전투 버튼(베기·피하기).
-// 보이고 숨는 것은 CSS(body.touch[data-mode])가 정한다. three를 쓰지 않는다.
+// 터치 조작: 화면 왼쪽 절반의 떠다니는 조이스틱과 오른쪽 아래 Z·X 버튼.
+// 보이고 숨는 것은 CSS(body.touch[data-mode])가 정한다.
 const R = 48;   // 조이스틱 반지름(px)
 
-export function createTouchControls({ onStick, onAttack, onDodge }) {
+export function createTouchControls({ onStick, onButton }) {
   const $ = id => document.getElementById(id);
   const zone = $('stick-zone'), base = $('stick'), knob = $('stick-knob');
   let active = null, cx = 0, cy = 0;
@@ -43,10 +43,14 @@ export function createTouchControls({ onStick, onAttack, onDodge }) {
   // 캡처를 잃으면(손 떼기를 못 받는 경우 대비) 놓아서, 다음 손가락이 다시 잡을 수 있게 한다.
   zone.addEventListener('lostpointercapture', e => { if (e.pointerId === active) release(); });
 
-  for (const [id, fn] of [['btn-attack', onAttack], ['btn-dodge', onDodge]]) {
-    $(id).addEventListener('pointerdown', e => {
+  // Z·X는 누를 때와 뗄 때를 알린다(X를 누르고 있으면 달리기)
+  for (const [id, name] of [['btn-z', 'z'], ['btn-x', 'x']]) {
+    const el = $(id);
+    el.addEventListener('pointerdown', e => {
       e.preventDefault();   // 누르는 순간 동작하고, 뒤따르는 클릭·확대를 막는다
-      fn();
+      el.setPointerCapture(e.pointerId);
+      onButton(name, true);
     });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(type, () => onButton(name, false));
   }
 }
