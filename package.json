@@ -1,0 +1,10 @@
+{
+  "name": "journey-of-achos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "serve": "python -m http.server 8000",
+    "fetch-assets": "node tools/fetch-assets.mjs"
+  }
+}
