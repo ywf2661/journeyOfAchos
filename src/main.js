@@ -26,6 +26,8 @@ let renderer, state, hero, blocked;
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
 let dialogue = null, view = null, ending = false;
 let fight = null, looks = [], slashes = [], hurt = 0, tickAcc = 0, time = 0;
+// 지역·날짜를 바꾸는 동안 그리기를 멈춘다. 상태는 이미 다음 날로 바뀌었지만, 화면이 다 어두워질 때까지 지난 장면을 그대로 둔다.
+let transitioning = false;
 
 const region = () => REGIONS[state.region];
 const map = () => MAPS[state.region];
@@ -40,11 +42,13 @@ function fail(e) {
 
 async function enterRegion() {
   mode = 'loading';
+  transitioning = true;
   ui.showPrompt(null);
   await ui.fade(true);
   const s = region().start;
   hero = createWalker(s.x, s.z, s.dir);
   refreshBlocked();
+  transitioning = false;
   saveGame(storage, state);
   await ui.fade(false);
   if (state.pendingFight) startFight(state.pendingFight);
@@ -266,7 +270,7 @@ function frame(now) {
   }
   if (mode === 'explore') checkTriggers();
   if (mode === 'combat') stepFight(dt);
-  if (hero) render(dt);
+  if (hero && !transitioning) render(dt);
   requestAnimationFrame(frame);
 }
 
