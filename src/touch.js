@@ -15,8 +15,9 @@ export function createTouchControls({ onStick, onAttack, onDodge }) {
     onStick(null);
   }
 
-  // 손가락을 댄 곳이 중심이 된다. 새 손가락이 닿으면 그 손가락이 이어받는다.
+  // 손가락을 댄 곳이 중심이 된다. 조이스틱을 쓰는 동안 다른 손가락(손바닥 끝 등)은 무시한다.
   zone.addEventListener('pointerdown', e => {
+    if (active !== null) return;
     active = e.pointerId;
     cx = e.clientX;
     cy = e.clientY;
@@ -39,6 +40,8 @@ export function createTouchControls({ onStick, onAttack, onDodge }) {
   for (const type of ['pointerup', 'pointercancel']) {
     addEventListener(type, e => { if (e.pointerId === active) release(); });
   }
+  // 캡처를 잃으면(손 떼기를 못 받는 경우 대비) 놓아서, 다음 손가락이 다시 잡을 수 있게 한다.
+  zone.addEventListener('lostpointercapture', e => { if (e.pointerId === active) release(); });
 
   for (const [id, fn] of [['btn-attack', onAttack], ['btn-dodge', onDodge]]) {
     $(id).addEventListener('pointerdown', e => {

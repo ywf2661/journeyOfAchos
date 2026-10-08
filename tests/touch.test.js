@@ -46,19 +46,27 @@ test('반지름(48px)보다 멀리 끌어도 기울기 길이는 1이다', () =>
   up(1);
 });
 
-test('다른 손가락은 무시하고, 새로 댄 손가락이 이어받는다', () => {
+test('조이스틱을 쓰는 동안 다른 손가락은 무시한다(손바닥이 닿아도 엄지가 계속 조작)', () => {
   down(1, 100, 300);
   const count = calls.stick.length;
   move(2, 300, 300);
-  up(2);
-  assert.equal(calls.stick.length, count);
   down(3, 50, 200);
   move(3, 50, 152);
+  up(3);
+  assert.equal(calls.stick.length, count);
+  move(1, 100, 252);
   assert.deepEqual(last(), { f: 1, r: 0 });
   up(1);
-  assert.notEqual(last(), null);
-  up(3);
   assert.equal(last(), null);
+});
+
+test('포인터 캡처를 잃으면 조이스틱을 놓는다(다음 손가락이 다시 잡을 수 있다)', () => {
+  down(1, 100, 300);
+  els['stick-zone'].h.lostpointercapture({ pointerId: 1 });
+  assert.equal(last(), null);
+  down(2, 100, 300);
+  assert.deepEqual(last(), { f: 0, r: 0 });
+  up(2);
 });
 
 test('손을 떼면 조이스틱이 기본 자리로 돌아간다', () => {
