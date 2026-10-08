@@ -48,6 +48,11 @@ export function createPlayer(obj, anim, camera, canvas) {
       if (!st.auto && dash <= 0) st.facing = facingOf(v);
     }
     if (!anim.busy()) anim.play(!v ? 'Idle' : speed === RUN ? 'Running_A' : 'Walking_A');
+    sync();
+  }
+
+  // 모델과 카메라를 지금 상태에 맞춘다. 순간이동 직후(로딩·페이드 중엔 update가 안 돈다)에도 부른다.
+  function sync() {
     obj.position.set(st.x, 0, st.z);
     obj.rotation.y = st.facing;
     camera.position.set(
@@ -65,6 +70,7 @@ export function createPlayer(obj, anim, camera, canvas) {
     teleport(x, z, facing) {
       Object.assign(st, { x, z, facing });
       yaw = facing + Math.PI;
+      sync();
     },
     dash() {
       dash = DASH_TIME;

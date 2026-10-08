@@ -5,7 +5,8 @@ import { REGIONS, FIGHTS } from '../data/regions.js';
 import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave } from './story.js';
 import { triggersFor, obstaclesFor } from './region.js';
 import { dist } from './geom.js';
-import { buildRegion, spawn, animate } from './world.js';
+import { buildRegion, spawn, animate, plagueLook } from './world.js';
+import { createFight, update as updateFight, swing, dodge, PLAYER_MAX_HP } from './combat.js';
 import { createPlayer } from './player.js';
 import * as ui from './ui.js';
 
@@ -32,6 +33,7 @@ const storage = (() => { try { return localStorage; } catch { return null; } })(
 let state, world, player, hero;
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
 let dialogue = null, view = null, ending = null;
+let fight = null, enemies = [], dying = [], tickAcc = 0;
 
 const region = () => REGIONS[state.region];
 
@@ -52,6 +54,7 @@ async function enterRegion() {
     hero = animate(obj);
     scene.add(obj);
     player = createPlayer(obj, hero, camera, canvas);
+    player.onClick = attack;
   }
   const s = region().start;
   player.teleport(s.x, s.z, s.rot);
@@ -114,9 +117,86 @@ async function closeDialogue() {
   }
 }
 
-// Task 9에서 실제 전투로 바뀐다. 지금은 바로 이긴 것으로 친다.
-async function startFight() {
-  openDialogue(winFight(state, FIGHTS));
+async function startFight(id) {
+  mode = 'loading';
+  const def = FIGHTS[id];
+  fight = createFight(def);
+  if (def.player) player.teleport(...def.player);
+  enemies = await Promise.all(fight.enemies.map(async e => {
+    const obj = await spawn('minion', { x: e.x, z: e.z });
+    plagueLook(obj);
+    const anim = animate(obj);
+    scene.add(obj);
+    return { obj, anim };
+  }));
+  // 멈춘 시간: 달려들던 자세 그대로 굳혀 둔다(믹서를 조금만 돌리고 더 돌리지 않는다).
+  if (def.frozen) for (const { anim } of enemies) { anim.play('Running_A'); anim.mixer.update(0.4); }
+  ui.setFrozenLook(!!def.frozen);
+  tickAcc = 0;
+  mode = 'combat';
+}
+
+function stepFight(dt) {
+  const events = updateFight(fight, dt, player.state);
+  fight.enemies.forEach((e, i) => {
+    const { obj, anim } = enemies[i];
+    if (e.hp <= 0) { anim.mixer.update(dt); return; }
+    obj.position.set(e.x, 0, e.z);
+    obj.rotation.y = Math.atan2(player.state.x - e.x, player.state.z - e.z);
+    if (fight.def.frozen) return;
+    anim.mixer.update(dt);
+    if (!anim.busy()) anim.play(dist(e, player.state) > 1.6 ? 'Walking_A' : 'Idle');
+  });
+  for (const ev of events) {
+    const [kind, i] = ev.split(':');
+    if (kind === 'windup') enemies[i].anim.play('1H_Melee_Attack_Chop', { once: true });
+    if (kind === 'hurt') hero.play('Hit_A', { once: true });
+    if (kind === 'lost') return loseFight();
+  }
+  if (fight.def.frozen && (tickAcc += dt) >= 1) { tickAcc -= 1; ui.tick(); }
+  ui.showHud(fight.hp, PLAYER_MAX_HP, fight.def.frozen ? fight.def.timeLimit - fight.time : null);
+}
+
+function attack() {
+  if (mode !== 'combat') return;
+  const events = swing(fight, player.state);
+  if (!events.length) return;
+  hero.play('1H_Melee_Attack_Slice_Horizontal', { once: true });
+  for (const ev of events) {
+    const [kind, i] = ev.split(':');
+    if (kind === 'hit') enemies[i].anim.play('Hit_A', { once: true });
+    if (kind === 'down') enemies[i].anim.play('Death_A', { once: true });
+    if (kind === 'won') winCurrentFight();
+  }
+}
+
+function clearFight() {
+  ui.setFrozenLook(false);
+  ui.hideHud();
+  dying = enemies;
+  enemies = [];
+  fight = null;
+}
+
+function winCurrentFight() {
+  mode = 'loading';
+  clearFight();
+  setTimeout(() => {
+    for (const e of dying) scene.remove(e.obj);
+    dying = [];
+    openDialogue(winFight(state, FIGHTS));
+  }, 1500);
+}
+
+function loseFight() {
+  mode = 'loading';
+  const id = state.pendingFight, frozen = fight.def.frozen;
+  clearFight();
+  for (const e of dying) scene.remove(e.obj);
+  dying = [];
+  hero.play('Death_A', { once: true });
+  ui.toast(frozen ? '멈춘 시간이 다시 흐른다… 처음부터.' : '쓰러졌다… 다시 일어선다.');
+  setTimeout(() => startFight(id).catch(fail), 1800);
 }
 
 // Task 10에서 함께 걷는 연출로 바뀐다. 지금은 엔딩 대사만 띄운다.
@@ -143,6 +223,8 @@ addEventListener('keydown', e => {
   } else if (mode === 'explore' && e.code === 'KeyE') {
     const t = nearestTrigger();
     if (t && !t.auto) openDialogue(t.node, t);
+  } else if (mode === 'combat' && e.code === 'Space' && dodge(fight)) {
+    player.dash();
   }
 });
 ui.onDialogClick(() => { if (mode === 'dialogue') advance(); });
@@ -152,10 +234,12 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
   world?.update(dt, t);
   hero?.mixer.update(dt);
+  for (const e of dying) e.anim.mixer.update(dt);
   if (player && (mode === 'explore' || mode === 'combat' || ending)) {
     player.update(dt, obstaclesFor(region(), state), region().bounds);
   }
   if (mode === 'explore') checkTriggers();
+  if (mode === 'combat') stepFight(dt);
   renderer.render(scene, camera);
 });
 
