@@ -22,7 +22,8 @@
   button:hover, button:focus-visible { background: rgba(201, 168, 106, 0.18); outline: none; }
   #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(860px, 92vw); background: var(--panel); border: 1px solid var(--gold); padding: 1.1rem 1.4rem 1.2rem; cursor: pointer; }
   #who { color: var(--gold); font-weight: 700; margin-bottom: 0.4rem; }
-  #text { line-height: 1.75; min-height: 3.5em; white-space: pre-wrap; }
+  #text { line-height: 1.75; min-height: 3.5em; white-space: pre-wrap; word-break: keep-all; }   /* 한국어는 단어 중간에서 줄을 바꾸지 않는다 */
+  #choices button, #prompt { word-break: keep-all; }
   #text.narration { color: #c8c0d8; font-style: italic; }
   #choices { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.8rem; }
   #choices button { text-align: left; min-width: 0; }
