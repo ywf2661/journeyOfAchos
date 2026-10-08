@@ -1,7 +1,7 @@
 # Journey of Achos — 아코스의 여정
 
 역병이 도는 왕국의 기사 아코스가 병을 고칠 방법을 찾아 떠났다가, 시간을 멈추는 마술사 아이온을 만나는
-30분 분량의 3D 웹 RPG입니다. 「어둠의 회랑」의 세계관을 빌린 독립작입니다.
+30분 분량의 2D 도트 웹 RPG입니다. 「어둠의 회랑」의 세계관을 빌린 독립작입니다.
 
 ## 실행
 
@@ -10,44 +10,31 @@
     npm run serve        # = python -m http.server 8000
     # http://localhost:8000
 
-최신 Chrome·Edge를 권장합니다. 인터넷 연결이 필요합니다(Three.js·글꼴을 CDN에서 받습니다).
+최신 Chrome·Edge를 권장합니다.
 
 휴대폰·태블릿에서는 GitHub Pages 주소(https://ywf2661.github.io/journeyOfAchos/)로 접속합니다. 가로·세로 모두 됩니다.
 
 ## 조작
 
-| 키 | 동작 |
-|---|---|
-| WASD / 방향키 | 걷기 |
-| Shift | 달리기 |
-| 마우스 끌기 | 시야 돌리기 |
-| E | 말 걸기·살펴보기 |
-| 클릭 / Space / E / Enter | 대사 넘기기 |
-| 숫자 1–3 | 선택지 고르기 |
-| 클릭 (전투) | 베기 |
-| Space (전투) | 피하기 |
+| 키 | 탐험·대화 | 전투 |
+|---|---|---|
+| 방향키 | 한 칸씩 걷기(짧게 누르면 방향만 바꿈), 선택지 고르기 | 걷기 |
+| Z | 말 걸기·살펴보기, 대사 넘기기, 선택지 결정 | 베기 |
+| X | 누르고 있으면 달리기, 대사 빨리 넘기기 | 피하기 |
+| 숫자 1–3 | 선택지 바로 고르기 | |
 
-휴대폰·태블릿:
-
-| 조작 | 동작 |
-|---|---|
-| 왼쪽 화면 끌기 | 걷기 (끝까지 밀면 달리기) |
-| 오른쪽 화면 끌기 | 시야 돌리기 |
-| 아래에 뜨는 안내 누르기 | 말 걸기·살펴보기 |
-| 대화창 누르기 | 대사 넘기기 |
-| [베기]·[피하기] (전투) | 베기·피하기 (화면 탭도 베기) |
+휴대폰·태블릿: 왼쪽 아래 조이스틱으로 걷고, 오른쪽 아래 Z·X 버튼은 위 표와 같습니다.
 
 진행은 자동 저장됩니다(지역에 들어갈 때, 대화가 끝날 때).
 
 ## 개발
 
     npm test             # node --test, Node 20 이상
-    npm run fetch-assets # data/models.js 목록대로 KayKit 에셋을 다시 받기(캐릭터는 받은 직후 줄인다)
-    npm run slim-assets  # 캐릭터 GLB에서 게임이 쓰는 애니메이션(ANIMATIONS)만 남기기
+    npm run shot -- <출력.png> 1280x720 [저장.json]   # 헤드리스 Chrome 스크린샷(서버를 먼저 띄운다)
 
-- 대사: `data/script.js` · 지역 배치와 전투: `data/regions.js` · 모델 목록: `data/models.js`
-- 게임 규칙(대화·저장·전투·충돌)은 `src/story.js`, `src/combat.js`, `src/geom.js`, `src/region.js`에 있고 테스트가 있습니다.
-- 설계: `docs/superpowers/specs/2026-10-08-journey-of-achos-design.md`
+- 대사: `data/script.js` · 지역 맵과 전투: `data/regions.js` · 맵 기호와 타일: `data/tiles.js` · 인물 그림: `data/sprites.js`
+- 게임 규칙(대화·저장·전투·칸 이동·맵)은 `src/story.js`, `src/combat.js`, `src/player.js`, `src/map.js`, `src/region.js`에 있고 테스트가 있습니다.
+- 설계: `docs/superpowers/specs/2026-10-08-2d-topdown-design.md`
 
 ## 배포
 
@@ -55,4 +42,4 @@ GitHub 저장소 Settings → Pages → Branch: `main`, 폴더: `/ (root)`. 모�
 
 ## 출처
 
-`CREDITS.md`를 보세요. 3D 에셋은 모두 KayKit(Kay Lousberg)의 CC0입니다.
+`CREDITS.md`를 보세요. 타일·인물 그림은 모두 Kenney의 CC0입니다.

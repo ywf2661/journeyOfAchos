@@ -5,7 +5,6 @@
   "scripts": {
     "test": "node --test",
     "serve": "python -m http.server 8000",
-    "fetch-assets": "node tools/fetch-assets.mjs",
-    "slim-assets": "node tools/slim-anims.mjs"
+    "shot": "node --experimental-websocket tools/shot.mjs"
   }
 }

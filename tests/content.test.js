@@ -146,11 +146,11 @@ function linesOf(start, flags) {
 
 test('touch가 켜져 있으면 터치 안내만, 꺼져 있으면 키보드 안내만 나온다', () => {
   const touchOpen = linesOf('r1_open', ['touch']).text, keysOpen = linesOf('r1_open', []).text;
-  assert.ok(touchOpen.includes('왼쪽 화면을 끌어') && !touchOpen.includes('WASD'), touchOpen);
-  assert.ok(keysOpen.includes('WASD') && !keysOpen.includes('왼쪽 화면을 끌어'), keysOpen);
+  assert.ok(touchOpen.includes('조이스틱') && !touchOpen.includes('방향키'), touchOpen);
+  assert.ok(keysOpen.includes('방향키') && !keysOpen.includes('조이스틱'), keysOpen);
   const touchRoad = linesOf('r1_road', ['touch']), keysRoad = linesOf('r1_road', []);
-  assert.ok(touchRoad.text.includes('[베기]') && !touchRoad.text.includes('Space'), touchRoad.text);
-  assert.ok(keysRoad.text.includes('Space') && !keysRoad.text.includes('[베기]'), keysRoad.text);
+  assert.ok(touchRoad.text.includes('Ⓩ') && !touchRoad.text.includes('Z를'), touchRoad.text);
+  assert.ok(keysRoad.text.includes('Z를') && !keysRoad.text.includes('Ⓩ'), keysRoad.text);
   assert.deepEqual(touchRoad.effects, ['combat:road']);
   assert.deepEqual(keysRoad.effects, ['combat:road']);
 });

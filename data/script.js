@@ -30,8 +30,8 @@ export const SCRIPT = {
     [K, '오늘 밤 떠난다. 고칠 방법을 찾기 전엔 돌아오지 않겠다.'],
   ], { next: 'r1_open_touch' }),
   // 조작 안내: 기기에 맞는 쪽 하나만 나온다(touch 플래그는 main.js가 부팅 때 정한다)
-  r1_open_touch: { if: 'touch', who: N, text: '(왼쪽 화면을 끌어서 걷는다. 끝까지 밀면 달린다. 오른쪽 화면을 끌면 주위를 둘러본다. 누군가에게 다가가면 아래에 안내가 뜨는데, 그걸 누르면 말을 건다.)', next: 'r1_open_keys' },
-  r1_open_keys: { if: '!touch', who: N, text: '(WASD로 걷고, Shift를 누르면 달린다. 마우스를 끌면 주위를 둘러본다. 누군가에게 다가가 E를 누르면 말을 건다.)' },
+  r1_open_touch: { if: 'touch', who: N, text: '(왼쪽 아래 조이스틱으로 한 칸씩 걷는다. Ⓧ를 누르고 있으면 달린다. 누군가를 바라보고 Ⓩ를 누르면 말을 건다.)', next: 'r1_open_keys' },
+  r1_open_keys: { if: '!touch', who: N, text: '(방향키로 한 칸씩 걷는다. X를 누르고 있으면 달린다. 누군가를 바라보고 Z를 누르면 말을 건다.)' },
 
   ...chain('r1_rack', [
     [N, '숙소 앞에 빈 갑주 걸이가 서 있다. 기둥에 누가 칼끝으로 글씨를 새겨 놓았다.'],
@@ -89,8 +89,8 @@ export const SCRIPT = {
     [N, '어둠 속에서 뭔가가 기어 나온다. 검게 굳은 딱지 사이로 병든 황록빛이 새어 나온다.'],
     [K, '짐승이었을까. 아니면… 사람이었을까.'],
   ], { next: 'r1_road_touch' }),
-  r1_road_touch: { if: 'touch', who: N, text: '(오른쪽 화면을 탭하거나 [베기]를 누르면 벤다. [피하기]를 누르면 몸을 피한다.)', next: 'r1_road_keys' },
-  r1_road_keys: { if: '!touch', who: N, text: '(클릭하면 벤다. Space를 누르면 몸을 피한다. 마우스를 끌면 주위를 둘러볼 수 있다.)', next: 'r1_road_go' },
+  r1_road_touch: { if: 'touch', who: N, text: '(Ⓩ를 누르면 바라보는 쪽을 벤다. Ⓧ를 누르면 몸을 피한다.)', next: 'r1_road_keys' },
+  r1_road_keys: { if: '!touch', who: N, text: '(Z를 누르면 바라보는 쪽을 벤다. X를 누르면 몸을 피한다.)', next: 'r1_road_go' },
   r1_road_go: { do: 'combat:road' },
   ...chain('r1_road_after', [[K, '사람만 걸리는 게 아니었군. 이 병은 뭐든 다른 것으로 바꿔 놓는다.']]),
 
