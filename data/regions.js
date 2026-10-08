@@ -5,7 +5,7 @@ export const REGIONS = {
   1: {
     name: '역병의 왕도',
     light: 'night',
-    ground: '#24232a',
+    ground: '#3a3842',
     bounds: { minX: -20, maxX: 20, minZ: -60, maxZ: 34 },
     start: { x: 0, z: 30, rot: PI },
     props: [
@@ -119,7 +119,7 @@ export const REGIONS = {
   3: {
     name: '새벽의 다리',
     light: 'dawn',
-    ground: '#4a4438',
+    ground: '#6b5a45',
     bounds: { minX: -14, maxX: 14, minZ: -90, maxZ: 18 },
     start: { x: 0, z: 12, rot: PI },
     props: [

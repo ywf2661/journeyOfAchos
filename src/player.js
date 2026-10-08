@@ -1,0 +1,76 @@
+// 3인칭 조작: WASD(방향키) 이동, Shift 달리기, 마우스 드래그로 시야 회전, 짧은 클릭 콜백, 회피 대시.
+// 키는 e.code로 읽는다. 한글 입력 상태에서도 같은 자리의 키가 같은 뜻이 된다.
+import { moveVector, facingOf, resolve } from './geom.js';
+
+const WALK = 4.2, RUN = 7.5, DASH = 13, DASH_TIME = 0.25, AUTO_WALK = 1.3, RADIUS = 0.6, CAM_DIST = 9;
+const CODES = {
+  KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd',
+  ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd',
+  ShiftLeft: 'shift', ShiftRight: 'shift',
+};
+
+export function createPlayer(obj, anim, camera, canvas) {
+  const keys = {};
+  const st = { x: 0, z: 0, facing: 0, auto: false };
+  let yaw = 0, pitch = 0.32, dash = 0, dashDir = null, drag = null, onClick = () => {};
+
+  const clearKeys = () => { for (const k in keys) keys[k] = false; };
+  addEventListener('keydown', e => { if (CODES[e.code]) keys[CODES[e.code]] = true; });
+  addEventListener('keyup', e => { if (CODES[e.code]) keys[CODES[e.code]] = false; });
+  addEventListener('blur', clearKeys);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    drag = { x: e.clientX, y: e.clientY, moved: 0 };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.moved += Math.abs(dx) + Math.abs(dy);
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    yaw -= dx * 0.005;
+    pitch = Math.min(1.2, Math.max(0.05, pitch + dy * 0.004));
+  });
+  canvas.addEventListener('pointerup', () => {
+    if (drag && drag.moved < 6) onClick();
+    drag = null;
+  });
+
+  function update(dt, obstacles, bounds) {
+    let v = null, speed = keys.shift ? RUN : WALK;
+    if (st.auto) { v = { x: Math.sin(st.facing), z: Math.cos(st.facing) }; speed = AUTO_WALK; }
+    else if (dash > 0) { dash -= dt; v = dashDir; speed = DASH; }
+    else v = moveVector(keys, yaw);
+    if (v) {
+      const next = { x: st.x + v.x * speed * dt, z: st.z + v.z * speed * dt };
+      Object.assign(st, st.auto ? next : resolve(next, RADIUS, obstacles, bounds));
+      if (!st.auto && dash <= 0) st.facing = facingOf(v);
+    }
+    if (!anim.busy()) anim.play(!v ? 'Idle' : speed === RUN ? 'Running_A' : 'Walking_A');
+    obj.position.set(st.x, 0, st.z);
+    obj.rotation.y = st.facing;
+    camera.position.set(
+      st.x + Math.sin(yaw) * Math.cos(pitch) * CAM_DIST,
+      1.5 + Math.sin(pitch) * CAM_DIST,
+      st.z + Math.cos(yaw) * Math.cos(pitch) * CAM_DIST,
+    );
+    camera.lookAt(st.x, 1.6, st.z);
+  }
+
+  return {
+    state: st,
+    update,
+    clearKeys,
+    teleport(x, z, facing) {
+      Object.assign(st, { x, z, facing });
+      yaw = facing + Math.PI;
+    },
+    dash() {
+      dash = DASH_TIME;
+      dashDir = moveVector(keys, yaw) ?? { x: Math.sin(st.facing), z: Math.cos(st.facing) };
+      anim.play('Dodge_Forward', { once: true });
+    },
+    set onClick(fn) { onClick = fn; },
+  };
+}

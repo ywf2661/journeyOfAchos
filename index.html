@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journey of Achos — 아코스의 여정</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap">
+<style>
+  :root { --gold: #c9a86a; --ink: #e8e0d0; --dim: #9a9284; --panel: rgba(12, 10, 16, 0.86); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: var(--ink); font-family: 'Nanum Myeongjo', serif; }
+  canvas#game { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  [hidden] { display: none !important; }
+  .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2rem; text-align: center; padding: 1rem; }
+  #title, #end { background: radial-gradient(ellipse at center, #1d1726 0%, #050407 75%); }
+  h1 { font-size: clamp(2rem, 6vw, 3.6rem); letter-spacing: 0.08em; margin: 0; color: var(--gold); font-weight: 700; }
+  .sub { color: var(--dim); margin: 0; }
+  button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--gold); padding: 0.6rem 1.6rem; cursor: pointer; min-width: 12rem; }
+  button:hover, button:focus-visible { background: rgba(201, 168, 106, 0.18); outline: none; }
+  #dialog { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); width: min(860px, 92vw); background: var(--panel); border: 1px solid var(--gold); padding: 1.1rem 1.4rem 1.2rem; cursor: pointer; }
+  #who { color: var(--gold); font-weight: 700; margin-bottom: 0.4rem; }
+  #text { line-height: 1.75; min-height: 3.5em; white-space: pre-wrap; }
+  #text.narration { color: #c8c0d8; font-style: italic; }
+  #choices { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.8rem; }
+  #choices button { text-align: left; min-width: 0; }
+  #prompt { position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--gold); padding: 0.4rem 1rem; }
+  #toast { position: fixed; top: 4vh; right: 3vw; background: var(--panel); border-left: 3px solid #a98be0; padding: 0.7rem 1.1rem; }
+  #hud { position: fixed; top: 3vh; left: 3vw; font-size: 1.4rem; letter-spacing: 0.2em; color: #e07a6a; }
+  #timer { color: #c8b0f0; font-size: 1rem; letter-spacing: 0; margin-left: 1rem; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
+  #fade.on { opacity: 1; }
+  #error { background: rgba(0, 0, 0, 0.94); color: #f0c0b0; white-space: pre-wrap; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud" hidden><span id="hearts"></span><span id="timer"></span></div>
+<div id="prompt" hidden></div>
+<div id="toast" hidden></div>
+<div id="dialog" hidden><div id="who"></div><div id="text"></div><div id="choices"></div></div>
+<div id="fade" class="on"></div>
+<div id="title" class="overlay" hidden>
+  <h1>Journey of Achos</h1>
+  <p class="sub">아코스의 여정</p>
+  <button id="btn-continue" hidden>이어하기</button>
+  <button id="btn-new">새로 시작</button>
+</div>
+<div id="end" class="overlay" hidden>
+  <h1>Journey of Achos</h1>
+  <p class="sub" id="end-memories"></p>
+  <button id="btn-restart">처음으로</button>
+</div>
+<div id="error" class="overlay" hidden></div>
+<script type="module" src="src/main.js"
+  onerror="var e=document.getElementById('error');e.textContent='게임 파일을 불러오지 못했습니다.\n인터넷 연결을 확인하고 새로고침해 주세요.';e.hidden=false"></script>
+</body>
+</html>
