@@ -76,10 +76,11 @@ export function toast(text) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
 }
 
-export function showHud(hp, max, timeLeft) {
+export function showHud(hp, max, timeLeft, gauge = 0, gaugeMax = 0) {
   const h = Math.max(0, hp);
   $('hud').hidden = false;
   $('hearts').textContent = '♥'.repeat(h) + '♡'.repeat(max - h);
+  $('gauge').textContent = '✦'.repeat(gauge) + '✧'.repeat(gaugeMax - gauge);   // 성휘 게이지
   $('timer').textContent = timeLeft == null ? '' : `멈춘 시간 ${Math.max(0, Math.ceil(timeLeft))}초`;
 }
 

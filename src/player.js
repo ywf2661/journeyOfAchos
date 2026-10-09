@@ -26,9 +26,9 @@ function start(w, dir, speed, blocked) {
   return true;
 }
 
-// 입력 { dir, run, auto }로 dt초만큼 움직인다. 칸 사이에 있으면 입력과 상관없이 다음 칸까지는 간다.
+// 입력 { dir, run, auto, slow }로 dt초만큼 움직인다(slow: 성휘참을 모으는 중이라 반 속도). 칸 사이에 있으면 입력과 상관없이 다음 칸까지는 간다.
 // 칸에 닿았을 때 방향이 눌려 있으면 남은 시간으로 이어서 걷는다(그래서 프레임 길이와 상관없이 같은 거리를 간다).
-export function step(w, { dir = null, run = false, auto = false } = {}, dt, blocked) {
+export function step(w, { dir = null, run = false, auto = false, slow = false } = {}, dt, blocked) {
   let left = dt;
   while (left > 1e-9) {
     if (!w.to) {
@@ -40,7 +40,7 @@ export function step(w, { dir = null, run = false, auto = false } = {}, dt, bloc
         left -= used;
         if (w.wait > 1e-9) return w;
       }
-      if (!start(w, dir, auto ? AUTO : run ? RUN : WALK, blocked)) { w.moving = false; return w; }
+      if (!start(w, dir, auto ? AUTO : slow ? WALK / 2 : run ? RUN : WALK, blocked)) { w.moving = false; return w; }
     }
     const used = Math.min(left, (1 - w.t) / w.speed);
     w.t += used * w.speed;

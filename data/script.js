@@ -89,8 +89,8 @@ export const SCRIPT = {
     [N, '어둠 속에서 뭔가가 기어 나온다. 검게 굳은 딱지 사이로 병든 황록빛이 새어 나온다.'],
     [K, '짐승이었을까. 아니면… 사람이었을까.'],
   ], { next: 'r1_road_touch' }),
-  r1_road_touch: { if: 'touch', who: N, text: '(Ⓩ를 누르면 바라보는 쪽을 벤다. Ⓧ를 누르면 몸을 피한다.)', next: 'r1_road_keys' },
-  r1_road_keys: { if: '!touch', who: N, text: '(Z를 누르면 바라보는 쪽을 벤다. X를 누르면 몸을 피한다.)', next: 'r1_road_go' },
+  r1_road_touch: { if: 'touch', who: N, text: '(Ⓩ를 누르면 바라보는 쪽을 벤다. Ⓧ를 누르면 몸을 피한다. 적을 벨 때마다 성휘가 모이고, ✦ 세 개가 차면 Ⓩ를 길게 눌렀다 떼어 성휘참을 쓴다.)', next: 'r1_road_keys' },
+  r1_road_keys: { if: '!touch', who: N, text: '(Z를 누르면 바라보는 쪽을 벤다. X를 누르면 몸을 피한다. 적을 벨 때마다 성휘가 모이고, ✦ 세 개가 차면 Z를 길게 눌렀다 떼어 성휘참을 쓴다.)', next: 'r1_road_go' },
   r1_road_go: { do: 'combat:road' },
   ...chain('r1_road_after', [[K, '사람만 걸리는 게 아니었군. 이 병은 뭐든 다른 것으로 바꿔 놓는다.']]),
 

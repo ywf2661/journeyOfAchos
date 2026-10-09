@@ -74,3 +74,9 @@ test('front는 바라보는 앞 칸', () => {
   assert.deepEqual(front(createWalker(3, 4, 'left')), { x: 2, z: 4 });
   assert.deepEqual(front(createWalker(3, 4, 'down')), { x: 3, z: 5 });
 });
+
+test('성휘참을 모으는 동안(slow)은 걷는 속도가 절반이다', () => {
+  const w = createWalker(0, 0, 'up');
+  step(w, { dir: 'up', slow: true }, 1 / WALK, open);
+  near(w.z, -0.5);
+});

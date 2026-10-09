@@ -144,6 +144,24 @@ export function createRenderer(canvas, sheets) {
       }
       ctx.drawImage(shade, 0, 0);
     }
+    // 성휘참: 금빛 초승달 칼날이 앞으로 4칸 뻗어 나가며 옅어진다(p: 0→1). 빛이라 어둠(조명) 위에 그린다.
+    for (const w of s.waves ?? []) {
+      const a = Math.PI / 2 - w.facing, reach = w.p * 4 * T;
+      const cx = px(w.x) + T / 2 + Math.cos(a) * reach, cy = py(w.z) + T / 2 + Math.sin(a) * reach;
+      ctx.globalAlpha = 1 - w.p * 0.7;
+      for (const [width, color, span] of [[5, '#ffd76a', 1.2], [2, '#ffffff', 1.0]]) {
+        ctx.lineWidth = width;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 12, a - span, a + span);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (s.flash > 0) {
+      ctx.fillStyle = `rgba(255, 250, 220, ${Math.min(0.6, s.flash * 5)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
     // 말 걸 수 있을 때 머리 위의 작은 Z
     for (const m of s.marks) {
       const x = px(m.x) + 4, y = py(m.z) - 10;

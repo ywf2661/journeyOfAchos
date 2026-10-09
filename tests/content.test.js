@@ -151,6 +151,7 @@ test('touch가 켜져 있으면 터치 안내만, 꺼져 있으면 키보드 안
   const touchRoad = linesOf('r1_road', ['touch']), keysRoad = linesOf('r1_road', []);
   assert.ok(touchRoad.text.includes('Ⓩ') && !touchRoad.text.includes('Z를'), touchRoad.text);
   assert.ok(keysRoad.text.includes('Z를') && !keysRoad.text.includes('Ⓩ'), keysRoad.text);
+  assert.ok(touchRoad.text.includes('Ⓩ를 길게') && keysRoad.text.includes('Z를 길게'), '성휘참 안내');
   assert.deepEqual(touchRoad.effects, ['combat:road']);
   assert.deepEqual(keysRoad.effects, ['combat:road']);
 });

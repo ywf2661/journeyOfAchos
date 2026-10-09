@@ -9,7 +9,7 @@ import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
 import { createWalker, step, dash, front, OPPOSITE } from './player.js';
 import { frameOf, SLASH_TIME } from './anim.js';
-import { createFight, update as updateFight, swing, dodge, PLAYER_MAX_HP } from './combat.js';
+import { createFight, update as updateFight, swing, dodge, holySlash, PLAYER_MAX_HP, HOLY_CHARGE, HOLY_GAUGE } from './combat.js';
 import { createInput } from './input.js';
 import { createTouchControls } from './touch.js';
 import { loadSheets, createRenderer } from './draw.js';
@@ -21,12 +21,14 @@ document.body.classList.toggle('touch', TOUCH);
 // localStorage 접근 자체가 막혀 있으면 null. story.js의 저장 함수들은 null도 받아 준다.
 const storage = (() => { try { return localStorage; } catch { return null; } })();
 const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
-const input = createInput({ onPress });
+const input = createInput({ onPress, onRelease });
+const WAVE_TIME = 0.3;   // 성휘참 빛 칼날이 4칸을 날아가는 시간(초)
 
 let renderer, state, hero, blocked;
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
 let dialogue = null, view = null, ending = false;
 let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   // heroSlash: 베기 동작이 끝날 때까지 남은 시간
+let charge = null, waves = [], flash = 0;   // charge: 전투 중 Z를 누르고 있는 시간(안 누르면 null)
 // 지역·날짜를 바꾸는 동안 그리기를 멈춘다. 상태는 이미 다음 날로 바뀌었지만, 화면이 다 어두워질 때까지 지난 장면을 그대로 둔다.
 let transitioning = false;
 
@@ -137,13 +139,27 @@ function stepFight(dt) {
     if (kind === 'lost') return loseFight();
   }
   if (fight.def.frozen && (tickAcc += dt) >= 1) { tickAcc -= 1; ui.tick(); }
-  ui.showHud(fight.hp, PLAYER_MAX_HP, fight.def.frozen ? fight.def.timeLimit - fight.time : null);
+  ui.showHud(fight.hp, PLAYER_MAX_HP, fight.def.frozen ? fight.def.timeLimit - fight.time : null, fight.gauge, HOLY_GAUGE);
 }
 
 function attack() {
   const events = swing(fight, hero);
   if (!events.length) return;
   heroSlash = SLASH_TIME;
+  showHits(events);
+}
+
+// 성휘참: Z를 HOLY_CHARGE초 넘게 누르고 있다 떼면, 게이지가 가득할 때 빛의 초승달 칼날이 앞으로 뻗어 나간다
+function holyAction() {
+  const events = holySlash(fight, hero);
+  if (!events.length) return;
+  heroSlash = SLASH_TIME;
+  flash = 0.12;
+  waves.push({ x: hero.x, z: hero.z, facing: hero.facing, t: 0 });
+  showHits(events);
+}
+
+function showHits(events) {
   for (const ev of events) {
     const [kind, i] = ev.split(':');
     if (kind === 'hit' || kind === 'down') looks[i].white = 0.15;
@@ -161,6 +177,7 @@ function clearFight() {
   ui.hideHud();
   fight = null;
   looks = [];
+  charge = null;
 }
 
 // 이기거나 지면 잠깐 그대로 보여 준 뒤(쓰러진 적이 깜빡이며 사라진다) 정리한다
@@ -208,9 +225,16 @@ function onPress(b) {
     const t = facingTrigger();
     if (t) openDialogue(t.node, t);
   } else if (mode === 'combat') {
-    if (b === 'z') attack();
+    if (b === 'z') { attack(); charge = 0; }
     if (b === 'x') dodgeAction();
   }
+}
+
+// 버튼을 떼는 순간: 전투 중 Z를 충분히 모았으면 성휘참
+function onRelease(b) {
+  if (b !== 'z') return;
+  if (mode === 'combat' && charge !== null && charge >= HOLY_CHARGE) holyAction();
+  charge = null;
 }
 
 // 숫자 1~9로 선택지를 바로 고른다
@@ -227,6 +251,10 @@ if (TOUCH) createTouchControls({ onStick: a => input.setStick(a), onButton: (b, 
 function render(dt) {
   heroSlash = Math.max(0, heroSlash - dt);
   hurt = Math.max(0, hurt - dt);
+  flash = Math.max(0, flash - dt);
+  waves = waves.filter(w => (w.t += dt) < WAVE_TIME);
+  // 성휘참을 쓸 수 있게 모였으면 금빛으로 깜빡인다
+  const ready = charge !== null && charge >= HOLY_CHARGE && fight?.gauge >= HOLY_GAUGE;
   const bob = moving => moving && Math.floor(time * 8) % 2 === 1;
   // 큰 스프라이트(아코스·아이온)는 자세에 맞는 프레임을, 작은 인물은 Kenney 칸 하나를 그린다
   const look = (sp, pose) => {
@@ -244,7 +272,8 @@ function render(dt) {
   });
   things.push({
     ...look(SPRITES.achos, { dir: hero.dir, moving: hero.moving, slash: heroSlash, t: time }),
-    x: hero.x, z: hero.z, tint: hurt > 0 ? '#c0392b' : undefined, alpha: fight?.invuln > 0 ? 0.5 : 1,
+    x: hero.x, z: hero.z, alpha: fight?.invuln > 0 ? 0.5 : 1,
+    tint: hurt > 0 ? '#c0392b' : ready && Math.floor(time * 12) % 2 ? '#ffd76a' : undefined,
   });
   fight?.enemies.forEach((e, i) => {
     const l = looks[i], p = SPRITES.plague;
@@ -259,7 +288,8 @@ function render(dt) {
     });
   });
   renderer.draw({
-    map: map(), cam: hero, things, t: time,
+    map: map(), cam: hero, things, t: time, flash,
+    waves: waves.map(w => ({ x: w.x, z: w.z, facing: w.facing, p: w.t / WAVE_TIME })),
     blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
     marks: mode === 'explore' && facingTrigger() ? [{ x: hero.x, z: hero.z }] : [],
     light: lightFor(region(), state),
@@ -276,7 +306,8 @@ function frame(now) {
     // 엔딩 자동 걷기는 인물을 무시하고, 맵의 막힌 칸(지평선의 성)에서 선다
     step(hero, { dir: 'up', auto: true }, dt, (x, z) => isSolid(map(), x, z));
   } else if (hero && (mode === 'explore' || mode === 'combat')) {
-    step(hero, input.state(), dt, blocked);
+    if (charge !== null) charge += dt;
+    step(hero, { ...input.state(), slow: mode === 'combat' && charge !== null }, dt, blocked);   // 모으는 동안은 반 속도
   }
   if (mode === 'explore') checkTriggers();
   if (mode === 'combat') stepFight(dt);

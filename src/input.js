@@ -1,5 +1,6 @@
 // 키보드·터치 입력을 모은다. 방향은 조이스틱이 먼저, 없으면 마지막에 누른 방향키. X를 누르고 있으면 달리기.
 // 누르는 순간(Z·X·방향)은 onPress로 한 번 알린다 — 대사 넘기기, 선택지 고르기, 베기·피하기에 쓴다.
+// Z·X를 떼는 순간은 onRelease로 알린다 — 성휘참은 Z를 누르고 있던 시간으로 정한다.
 import { DEADZONE } from './geom.js';
 
 const ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
@@ -12,7 +13,7 @@ export function stickDir(a) {
   return a.r > 0 ? 'right' : 'left';
 }
 
-export function createInput({ onPress }) {
+export function createInput({ onPress, onRelease = () => {} }) {
   const arrows = [], held = { z: false, x: false };
   let stick = null;
   addEventListener('keydown', e => {
@@ -26,6 +27,7 @@ export function createInput({ onPress }) {
   addEventListener('keyup', e => {
     const dir = ARROWS[e.code], btn = BUTTONS[e.code];
     if (dir && arrows.includes(dir)) arrows.splice(arrows.indexOf(dir), 1);
+    if (btn && held[btn]) onRelease(btn);
     if (btn) held[btn] = false;
   });
   // 대화가 열리거나 창이 포커스를 잃으면 눌려 있던 것을 모두 놓는다
@@ -44,6 +46,7 @@ export function createInput({ onPress }) {
     },
     button(b, down) {
       if (down && !held[b]) onPress(b);
+      if (!down && held[b]) onRelease(b);
       held[b] = down;
     },
     clear,

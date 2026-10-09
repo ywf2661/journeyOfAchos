@@ -6,8 +6,8 @@ import { createInput, stickDir } from '../src/input.js';
 const win = {};
 globalThis.addEventListener = (type, fn) => (win[type] ??= []).push(fn);
 const key = (type, code, extra = {}) => win[type].forEach(fn => fn({ code, preventDefault() {}, ...extra }));
-const pressed = [];
-const input = createInput({ onPress: b => pressed.push(b) });
+const pressed = [], released = [];
+const input = createInput({ onPress: b => pressed.push(b), onRelease: b => released.push(b) });
 
 test('stickDir: 더 많이 기운 축 하나로 4방향, 데드존 안이면 null', () => {
   assert.equal(stickDir({ f: 0.9, r: 0.3 }), 'up');
@@ -66,4 +66,16 @@ test('터치 버튼은 누르는 순간 알리고, clear는 눌려 있던 것을
   key('keyup', 'ArrowUp');
   input.button('x', false);
   assert.deepEqual(pressed, ['x', 'up']);
+});
+
+test('Z·X를 떼는 순간도 알린다(성휘참 모으기). 누르지 않은 버튼·방향키는 알리지 않는다', () => {
+  released.length = 0;
+  key('keydown', 'KeyZ');
+  key('keyup', 'KeyZ');
+  input.button('z', true);
+  input.button('z', false);
+  input.button('x', false);
+  key('keydown', 'ArrowUp');
+  key('keyup', 'ArrowUp');
+  assert.deepEqual(released, ['z', 'z']);
 });
