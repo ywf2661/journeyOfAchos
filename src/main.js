@@ -22,7 +22,7 @@ document.body.classList.toggle('touch', TOUCH);
 // localStorage 접근 자체가 막혀 있으면 null. story.js의 저장 함수들은 null도 받아 준다.
 const storage = (() => { try { return localStorage; } catch { return null; } })();
 const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
-const input = createInput({ onPress, onRelease });
+const input = createInput({ onPress, onRelease, onCancel: () => { charge = null; } });   // 놓치면 성휘참 모으기도 그친다
 const WAVE_TIME = 0.3;   // 성휘참 빛 칼날이 4칸을 날아가는 시간(초)
 
 let renderer, state, hero, blocked, baseBlocked;
@@ -252,7 +252,7 @@ function onPress(b) {
   } else if (mode === 'explore' && b === 'z') {
     const f = front(hero), dev = puzzleOn() && deviceAt(puzzle, f.x, f.z);
     if (dev === 'clock') return onPuzzle(toggleTime(puzzle));
-    if (dev === 'reset') { resetPuzzle(puzzle); ui.toast('돌을 처음 자리로 되돌렸다.'); return; }
+    if (dev === 'reset') { ui.toast(resetPuzzle(puzzle, hero.to ?? hero) ? '돌을 처음 자리로 되돌렸다.' : '돌이 돌아올 자리에 서 있다.'); return; }
     const t = facingTrigger();
     if (t) openDialogue(t.node, t);
   } else if (mode === 'combat') {

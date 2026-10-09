@@ -72,6 +72,7 @@ export function stepOn(p, x, z) {
   const i = (p.def.steps ?? []).findIndex(c => same(c, x, z));
   if (p.solved || i < 0 || i < p.next) return [];
   if (i > p.next) {
+    if (!p.next) return [];   // 켜진 돌이 없으면 꺼질 빛도 없다
     p.next = 0;
     return ['wrong'];
   }
@@ -97,8 +98,12 @@ export function tick(p, dt) {
 }
 
 // 다시 놓기 돌: 처음 상태로(풀린 퍼즐은 그대로)
-export function reset(p) {
-  if (!p.solved) Object.assign(p, createPuzzle(p.def));
+// at: 아코스가 선(또는 들어서는) 칸. 돌이 돌아올 칸(처음 돌·구덩이 자리)이면 되돌리지 않는다. 되돌렸으면 true.
+export function reset(p, at) {
+  const back = [...(p.def.boulders ?? []), ...(p.def.pits ?? [])];
+  if (p.solved || (at && back.some(c => same(c, at.x, at.z)))) return false;
+  Object.assign(p, createPuzzle(p.def));
+  return true;
 }
 
 // Z로 칠 수 있는 장치가 이 칸에 있나(풀린 퍼즐은 없음)

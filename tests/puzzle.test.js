@@ -85,6 +85,22 @@ test('낙엽이 모두 목표 칸일 때 멈추면 풀리고, 아닐 때 멈추�
   assert.deepEqual(toggleTime(p), []);
 });
 
+test('순서 돌: 켜진 돌이 없을 때 다른 돌을 밟으면 아무 일도 없다(꺼질 빛이 없다)', () => {
+  const p = createPuzzle(STEPS);
+  assert.deepEqual(stepOn(p, 4, 0), []);
+  assert.equal(p.next, 0);
+});
+
+test('다시 놓기: 아코스가 돌이 돌아올 칸(처음 돌·구덩이 자리)에 서 있으면 되돌리지 않는다', () => {
+  const p = createPuzzle(PLATES);
+  push(p, 1, 1, 1, 0, open);
+  assert.equal(reset(p, { x: 1, z: 1 }), false);
+  assert.deepEqual(p.boulders, [{ x: 2, z: 1 }, { x: 3, z: 1 }]);
+  assert.equal(reset(p, { x: 0, z: 1 }), true);
+  assert.deepEqual(p.boulders, [{ x: 1, z: 1 }, { x: 3, z: 1 }]);
+  assert.equal(reset(createPuzzle(PITS), { x: PITS.pits[0][0], z: PITS.pits[0][1] }), false);
+});
+
 test('다시 놓기: 처음 상태로 돌아간다. Z로 칠 수 있는 것은 다시 놓기 돌과 시계 돌뿐', () => {
   const p = createPuzzle(PLATES);
   push(p, 1, 1, 1, 0, open);

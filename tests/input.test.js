@@ -7,7 +7,8 @@ const win = {};
 globalThis.addEventListener = (type, fn) => (win[type] ??= []).push(fn);
 const key = (type, code, extra = {}) => win[type].forEach(fn => fn({ code, preventDefault() {}, ...extra }));
 const pressed = [], released = [];
-const input = createInput({ onPress: b => pressed.push(b), onRelease: b => released.push(b) });
+let cancelled = 0;
+const input = createInput({ onPress: b => pressed.push(b), onRelease: b => released.push(b), onCancel: () => cancelled++ });
 
 test('stickDir: 더 많이 기운 축 하나로 4방향, 데드존 안이면 null', () => {
   assert.equal(stickDir({ f: 0.9, r: 0.3 }), 'up');
@@ -78,4 +79,14 @@ test('Z·X를 떼는 순간도 알린다(성휘참 모으기). 누르지 않은 
   key('keydown', 'ArrowUp');
   key('keyup', 'ArrowUp');
   assert.deepEqual(released, ['z', 'z']);
+});
+
+test('창이 포커스를 잃으면 눌려 있던 Z를 떼었다고 하지 않고 취소를 알린다(성휘참이 나가지도, 모으기가 남지도 않게)', () => {
+  released.length = 0;
+  cancelled = 0;
+  key('keydown', 'KeyZ');
+  win.blur.forEach(fn => fn());
+  key('keyup', 'KeyZ');
+  assert.deepEqual(released, []);
+  assert.equal(cancelled, 1);
 });
