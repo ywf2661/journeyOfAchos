@@ -42,23 +42,28 @@ export function createRenderer(canvas, sheets) {
   addEventListener('resize', resize);
   resize();
 
-  const src = ([sheet, i]) => [sheets[sheet], (i % SHEETS[sheet].cols) * T, Math.floor(i / SHEETS[sheet].cols) * T];
+  // 시트의 칸 하나: [그림, x, y, 너비, 높이]. 칸 크기는 시트의 cell(없으면 16×16)
+  const src = ([sheet, i]) => {
+    const { cols, cell: [cw, ch] = [T, T] } = SHEETS[sheet];
+    return [sheets[sheet], (i % cols) * cw, Math.floor(i / cols) * ch, cw, ch];
+  };
 
   // 색을 덧칠한 스프라이트(왕의 금빛, 역병의 검정, 맞을 때의 흰빛)는 한 번 만들어 둔다
   function sprite(art, tint) {
     if (!tint) return src(art);
     const key = `${art}:${tint}`;
     if (!tinted.has(key)) {
+      const [img, sx, sy, w, h] = src(art);
       const c = document.createElement('canvas');
-      c.width = c.height = T;
+      c.width = w;
+      c.height = h;
       const g = c.getContext('2d');
-      const [img, sx, sy] = src(art);
-      g.drawImage(img, sx, sy, T, T, 0, 0, T, T);
+      g.drawImage(img, sx, sy, w, h, 0, 0, w, h);
       g.globalCompositeOperation = 'source-atop';
       g.globalAlpha = 0.65;
       g.fillStyle = tint;
-      g.fillRect(0, 0, T, T);
-      tinted.set(key, [c, 0, 0]);
+      g.fillRect(0, 0, w, h);
+      tinted.set(key, [c, 0, 0, w, h]);
     }
     return tinted.get(key);
   }
@@ -100,25 +105,23 @@ export function createRenderer(canvas, sheets) {
         ctx.fillRect(x + 5 + (k % 3) * 2, y + 5 + Math.floor(k / 3) * 3 - up, 2, 3);
       }
     }
-    // 인물·적: 아래(남쪽)에 있는 것을 나중에 그려 앞에 보이게 한다
+    // 인물·적: 아래(남쪽)에 있는 것을 나중에 그려 앞에 보이게 한다.
+    // 그림의 발(foot, 없으면 16×16 칸의 아래 가운데)을 칸의 아래 가운데에 맞춘다 — 큰 스프라이트는 머리와 칼이 위 칸까지 올라온다.
     for (const o of [...s.things].sort((a, b) => a.z - b.z)) {
-      const [img, sx, sy] = sprite(o.art, o.tint);
+      const [img, sx, sy, w, h] = sprite(o.art, o.tint);
+      const [fx, fy] = o.foot ?? [T / 2, T - 1];
       ctx.save();
       ctx.globalAlpha = o.alpha ?? 1;
-      ctx.translate(px(o.x) + T / 2, py(o.z) + T / 2 - (o.bob ? 1 : 0));
-      if (o.lie) ctx.rotate(-Math.PI / 2);
-      if (o.flip) ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, sy, T, T, -T / 2, -T / 2, T, T);
+      if (o.lie) {   // 누운 인물(작은 그림): 칸 가운데를 축으로 돌린다
+        ctx.translate(px(o.x) + T / 2, py(o.z) + T / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.drawImage(img, sx, sy, w, h, -w / 2, -h / 2, w, h);
+      } else {
+        ctx.translate(px(o.x) + T / 2, py(o.z) + T - 1 - (o.bob ? 1 : 0));
+        if (o.flip) ctx.scale(-1, 1);
+        ctx.drawImage(img, sx, sy, w, h, -fx, -fy, w, h);
+      }
       ctx.restore();
-    }
-    // 베기: 바라보는 쪽의 흰 반달. 방향각 θ의 앞(sin θ, cos θ)은 화면 각도 π/2 − θ다.
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    for (const sl of s.slashes) {
-      const a = Math.PI / 2 - sl.facing;
-      ctx.beginPath();
-      ctx.arc(px(sl.x) + T / 2, py(sl.z) + T / 2, 14, a - 1, a + 1);
-      ctx.stroke();
     }
     // 조명: 분위기 색을 덧씌우고, 밤에는 불빛 둘레를 둥글게 비워 밝게 남긴다
     const L = LIGHT[s.light];

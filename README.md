@@ -33,6 +33,7 @@
     npm run shot -- <출력.png> 1280x720 [저장.json]   # 헤드리스 Chrome 스크린샷(서버를 먼저 띄운다)
 
 - 대사: `data/script.js` · 지역 맵과 전투: `data/regions.js` · 맵 기호와 타일: `data/tiles.js` · 인물 그림: `data/sprites.js`
+- 아코스·아이온 도트는 힉스필드 참고 시트를 `tools/pixelize.py`(파이썬 + Pillow)로 줄여 만든다. 만든 명령은 그 파일 맨 위에 있다.
 - 게임 규칙(대화·저장·전투·칸 이동·맵)은 `src/story.js`, `src/combat.js`, `src/player.js`, `src/map.js`, `src/region.js`에 있고 테스트가 있습니다.
 - 설계: `docs/superpowers/specs/2026-10-08-2d-topdown-design.md`
 
@@ -42,4 +43,4 @@ GitHub 저장소 Settings → Pages → Branch: `main`, 폴더: `/ (root)`. 모�
 
 ## 출처
 
-`CREDITS.md`를 보세요. 타일·인물 그림은 모두 Kenney의 CC0입니다.
+`CREDITS.md`를 보세요. 타일과 작은 인물 그림은 Kenney의 CC0이고, 아코스·아이온은 힉스필드로 만든 그림입니다.

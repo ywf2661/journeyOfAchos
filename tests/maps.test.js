@@ -30,6 +30,18 @@ test('모든 그림이 있는 시트의 칸을 가리킨다', () => {
   }
 });
 
+test('아코스·아이온은 큰 스프라이트이고, 모든 프레임 번호가 시트 안에 있다', () => {
+  for (const key of ['achos', 'aion']) {
+    const s = SPRITES[key], sheet = SHEETS[s.sheet];
+    assert.ok(sheet?.cell, `${key}: 칸 크기가 있는 시트`);
+    const frames = [s.idle, s.walk, s.slash].filter(Boolean).flatMap(g => Object.values(g).flat());
+    assert.ok(frames.length >= 3, key);
+    for (const i of frames) assert.ok(Number.isInteger(i) && i >= 0 && i < sheet.cols * sheet.rows, `${key}: ${i}`);
+    const [fx, fy] = s.foot;
+    assert.ok(fx >= 0 && fx < sheet.cell[0] && fy >= 0 && fy < sheet.cell[1], `${key}: 발 위치`);
+  }
+});
+
 test('인물은 정해 둔 그림을 쓰고, 막히지 않은 정수 칸에 선다(눕는 인물은 병상 위)', () => {
   for (const [k, r] of Object.entries(REGIONS)) {
     for (const a of r.actors) {

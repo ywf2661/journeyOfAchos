@@ -1,9 +1,12 @@
-// 맵 기호와 그림. 칸 번호는 시트의 왼쪽 위부터 가로로 0, 1, 2…(16×16, 여백 없음). Kenney Tiny 시리즈, CC0.
+// 맵 기호와 그림. 칸 번호는 시트의 왼쪽 위부터 가로로 0, 1, 2…(칸은 cell이 없으면 16×16, 여백 없음). Kenney Tiny 시리즈는 CC0.
 export const SHEETS = {
   town: { url: 'assets/kenney/tiny-town.png', cols: 12, rows: 11 },
   dungeon: { url: 'assets/kenney/tiny-dungeon.png', cols: 12, rows: 11 },
   battle: { url: 'assets/kenney/tiny-battle.png', cols: 18, rows: 11 },
   farm: { url: 'assets/kenney/tiny-farm.png', cols: 12, rows: 11 },
+  // 아코스·아이온: 힉스필드로 그린 도트(tools/pixelize.py). 칸이 40×32로 크고, 칸마다 발 위치가 같다(data/sprites.js의 foot)
+  achos: { url: 'assets/sprites/achos.png', cols: 18, rows: 1, cell: [40, 32] },
+  aion: { url: 'assets/sprites/aion.png', cols: 4, rows: 1, cell: [40, 32] },
 };
 const town = i => ['town', i], dun = i => ['dungeon', i], bat = i => ['battle', i], farm = i => ['farm', i];
 

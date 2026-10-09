@@ -8,6 +8,7 @@ import { triggersFor, actorsFor, blockedFor, lightFor, matches } from './region.
 import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
 import { createWalker, step, dash, front, OPPOSITE } from './player.js';
+import { frameOf, SLASH_TIME } from './anim.js';
 import { createFight, update as updateFight, swing, dodge, PLAYER_MAX_HP } from './combat.js';
 import { createInput } from './input.js';
 import { createTouchControls } from './touch.js';
@@ -25,7 +26,7 @@ const input = createInput({ onPress });
 let renderer, state, hero, blocked;
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
 let dialogue = null, view = null, ending = false;
-let fight = null, looks = [], slashes = [], hurt = 0, tickAcc = 0, time = 0;
+let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   // heroSlash: 베기 동작이 끝날 때까지 남은 시간
 // 지역·날짜를 바꾸는 동안 그리기를 멈춘다. 상태는 이미 다음 날로 바뀌었지만, 화면이 다 어두워질 때까지 지난 장면을 그대로 둔다.
 let transitioning = false;
 
@@ -142,7 +143,7 @@ function stepFight(dt) {
 function attack() {
   const events = swing(fight, hero);
   if (!events.length) return;
-  slashes.push({ x: hero.x, z: hero.z, facing: hero.facing, life: 0.12 });
+  heroSlash = SLASH_TIME;
   for (const ev of events) {
     const [kind, i] = ev.split(':');
     if (kind === 'hit' || kind === 'down') looks[i].white = 0.15;
@@ -224,17 +225,26 @@ ui.onPromptClick(() => onPress('z'));
 if (TOUCH) createTouchControls({ onStick: a => input.setStick(a), onButton: (b, down) => input.button(b, down) });
 
 function render(dt) {
-  slashes = slashes.filter(s => (s.life -= dt) > 0);
+  heroSlash = Math.max(0, heroSlash - dt);
   hurt = Math.max(0, hurt - dt);
   const bob = moving => moving && Math.floor(time * 8) % 2 === 1;
+  // 큰 스프라이트(아코스·아이온)는 자세에 맞는 프레임을, 작은 인물은 Kenney 칸 하나를 그린다
+  const look = (sp, pose) => {
+    if (!sp.sheet) return { art: sp.art };
+    const f = frameOf(sp, pose);
+    return { art: [sp.sheet, f.index], foot: sp.foot, flip: f.flip };
+  };
   const things = actorsFor(region(), state).map(a => {
-    const follow = ending && a.m === 'aion';   // 엔딩: 아이온이 아코스 오른쪽에서 함께 걷는다
+    const follow = ending && a.m === 'aion';   // 엔딩: 아이온이 아코스 오른쪽에서 함께(뒷모습으로) 걷는다
     const sp = SPRITES[a.m];
-    return { art: sp.art, tint: a.tint ?? sp.tint, x: follow ? hero.x + 1 : a.x, z: follow ? hero.z : a.z, lie: a.lie, bob: follow && bob(hero.moving) };
+    return {
+      ...look(sp, { dir: follow ? 'up' : 'down' }), tint: a.tint ?? sp.tint,
+      x: follow ? hero.x + 1 : a.x, z: follow ? hero.z : a.z, lie: a.lie, bob: follow && bob(hero.moving),
+    };
   });
   things.push({
-    art: SPRITES.achos.art, x: hero.x, z: hero.z, flip: hero.dir === 'left', bob: bob(hero.moving),
-    tint: hurt > 0 ? '#c0392b' : SPRITES.achos.tint, alpha: fight?.invuln > 0 ? 0.5 : 1,
+    ...look(SPRITES.achos, { dir: hero.dir, moving: hero.moving, slash: heroSlash, t: time }),
+    x: hero.x, z: hero.z, tint: hurt > 0 ? '#c0392b' : undefined, alpha: fight?.invuln > 0 ? 0.5 : 1,
   });
   fight?.enemies.forEach((e, i) => {
     const l = looks[i], p = SPRITES.plague;
@@ -249,7 +259,7 @@ function render(dt) {
     });
   });
   renderer.draw({
-    map: map(), cam: hero, things, slashes, t: time,
+    map: map(), cam: hero, things, t: time,
     blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
     marks: mode === 'explore' && facingTrigger() ? [{ x: hero.x, z: hero.z }] : [],
     light: lightFor(region(), state),
