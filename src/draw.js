@@ -176,6 +176,14 @@ export function createRenderer(canvas, sheets) {
       }
       ctx.restore();
     }
+    // 위로 휘두를 때: 뒷모습 그림만으로는 칼이 오른쪽으로 가는 듯 보여서, 머리 위에 흰 반달을 덧그린다
+    if (s.swing) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px(s.swing.x) + T / 2, py(s.swing.z) + T / 2, 18, -Math.PI / 2 - 1, -Math.PI / 2 + 1);
+      ctx.stroke();
+    }
     // 조명: 분위기 색을 덧씌우고, 밤에는 불빛 둘레를 둥글게 비워 밝게 남긴다
     const L = LIGHT[s.light];
     if (L) {
@@ -215,9 +223,9 @@ export function createRenderer(canvas, sheets) {
       ctx.fillStyle = `rgba(255, 250, 220, ${Math.min(0.6, s.flash * 5)})`;
       ctx.fillRect(0, 0, W, H);
     }
-    // 말 걸 수 있을 때 머리 위의 작은 Z
+    // 말 걸 수 있을 때 머리 위의 작은 Z(아코스는 큰 그림이라 머리가 칸 위로 8px쯤 올라온다)
     for (const m of s.marks) {
-      const x = px(m.x) + 4, y = py(m.z) - 10;
+      const x = px(m.x) + 4, y = py(m.z) - 20;
       ctx.fillStyle = '#e8e0d0';
       ctx.fillRect(x, y, 9, 9);
       ctx.fillStyle = '#1a1410';

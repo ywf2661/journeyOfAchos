@@ -322,6 +322,7 @@ function render(dt) {
     map: map(), cam: hero, things, t: time, flash,
     puzzle: puzzle && pieces(puzzle),
     waves: waves.map(w => ({ x: w.x, z: w.z, facing: w.facing, p: w.t / WAVE_TIME })),
+    swing: hero.dir === 'up' && heroSlash > 0 && heroSlash <= SLASH_TIME / 2 ? { x: hero.x, z: hero.z } : null,
     blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
     marks: mode === 'explore' && facingTrigger() ? [{ x: hero.x, z: hero.z }] : [],
     light: lightFor(region(), state),
