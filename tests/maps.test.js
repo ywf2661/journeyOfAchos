@@ -6,6 +6,7 @@ import { SPRITES } from '../data/sprites.js';
 import { parseMap, isSolid } from '../src/map.js';
 import { DIRS, AUTO } from '../src/player.js';
 import { dist } from '../src/geom.js';
+import { createPuzzle, blockedBy } from '../src/puzzle.js';
 
 const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
 const STEPS = Object.values(DIRS).map(({ dx, dz }) => [dx, dz]);
@@ -57,11 +58,17 @@ test('시작 위치와 전투 시작 위치는 4방향 이름을 가진다(3D �
   for (const [id, f] of Object.entries(FIGHTS)) assert.ok(DIRS[f.player[2]], id);
 });
 
-// 시작 칸에서 4방향으로 걸어서 갈 수 있는 칸. 인물 칸은 막힌 것으로, 조건부 차단 칸(성문)은 열린 것으로 본다.
+// 시작 칸에서 4방향으로 걸어서 갈 수 있는 칸. 인물 칸은 막힌 것으로, 조건부 차단 칸(문)은 열린 것으로,
+// 퍼즐은 푼 모습(돌은 발판·구덩이, 낙엽 다리)으로 본다. 퍼즐이 실제로 풀리는지는 puzzles.test.js.
 function reachable(k) {
   const r = REGIONS[k], m = MAPS[k];
+  const pz = r.puzzle && createPuzzle(r.puzzle, true);
   const actors = new Set(r.actors.map(a => `${a.x},${a.z}`));
-  const ok = (x, z) => !isSolid(m, x, z) && !actors.has(`${x},${z}`);
+  const ok = (x, z) => {
+    if (actors.has(`${x},${z}`)) return false;
+    const v = pz ? blockedBy(pz, x, z) : null;
+    return v === null ? !isSolid(m, x, z) : !v;
+  };
   const seen = new Set([`${r.start.x},${r.start.z}`]), queue = [[r.start.x, r.start.z]];
   while (queue.length) {
     const [x, z] = queue.shift();

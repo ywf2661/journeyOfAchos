@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { SCRIPT, MEMORIES } from '../data/script.js';
 import { REGIONS, FIGHTS } from '../data/regions.js';
 import { SPRITES } from '../data/sprites.js';
-import { createState, createDialogue, applyEffect, winFight, markDone } from '../src/story.js';
-import { triggersFor } from '../src/region.js';
+import { createState, createDialogue, applyEffect, winFight, markDone, has } from '../src/story.js';
+import { triggersFor, matches } from '../src/region.js';
+import { applySolved } from '../src/puzzle.js';
 import { dist } from '../src/geom.js';
 
 const triggers = Object.values(REGIONS).flatMap(r => r.triggers);
+const puzzleSays = Object.values(REGIONS).map(r => r.puzzle?.say).filter(Boolean);
 const EFFECT = /^(nextDay|ending|region:[1-5]|combat:(\w+))$/;
 
 test('모든 next와 선택지가 있는 노드를 가리킨다', () => {
@@ -23,6 +25,7 @@ test('트리거·전투·엔딩이 가리키는 노드가 있다', () => {
   for (const t of triggers) assert.ok(SCRIPT[t.node], `트리거 ${t.id}`);
   for (const [id, f] of Object.entries(FIGHTS)) assert.ok(SCRIPT[f.then], `전투 ${id}`);
   assert.ok(SCRIPT.ending);
+  for (const p of puzzleSays) assert.ok(SCRIPT[p], `퍼즐 ${p}`);
 });
 
 test('do 효과 형식이 맞고 전투 id가 정의돼 있다', () => {
@@ -54,7 +57,7 @@ test('선택지 노드에는 조건 없는 선택지가 하나 이상 있다', (
 
 test('어디서도 닿지 않는 노드가 없다', () => {
   const seen = new Set();
-  const stack = [...triggers.map(t => t.node), ...Object.values(FIGHTS).map(f => f.then), 'ending'];
+  const stack = [...triggers.map(t => t.node), ...Object.values(FIGHTS).map(f => f.then), ...puzzleSays, 'ending'];
   while (stack.length) {
     const id = stack.pop();
     if (!id || seen.has(id)) continue;
@@ -87,6 +90,13 @@ function playthrough({ pickTrigger, pickChoice, flags = [] }) {
     }
   }
   for (let step = 0; step < 300 && !state.ended; step++) {
+    // 퍼즐은 동작할 수 있게 되면 바로 푼 것으로 친다(실제로 풀리는지는 puzzles.test.js가 본다)
+    const pz = REGIONS[state.region].puzzle;
+    if (pz && matches(pz, state) && !has(state, `solved:${pz.id}`)) {
+      const say = applySolved(state, pz);
+      if (say) run(say);
+      continue;
+    }
     const avail = triggersFor(REGIONS[state.region], state);
     assert.ok(avail.length, `막혔다: 지역 ${state.region}, ${state.day}일째, 플래그 [${state.flags}]`);
     const t = pickTrigger(avail);

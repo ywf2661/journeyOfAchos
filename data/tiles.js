@@ -35,6 +35,9 @@ export const TILES = {
   e: { ground: town(0), top: dun(72), solid: true },              // 병상
   k: { ground: town(0), top: dun(63), solid: true },              // 괘종시계
   s: { ground: town(25), top: town(83), solid: true },            // 표지판
+  u: { ground: town(0), top: farm(83), solid: true },             // 해바라기
+  v: { ground: town(0), top: farm(98), solid: true },             // 빈 여물통(왼쪽)
+  V: { ground: town(0), top: farm(99), solid: true },             // 빈 여물통(오른쪽)
   q: { ground: town(0), top: dun(64), solid: true },              // 무덤
   l: { ground: town(0), top: dun(29), solid: true, light: true }, // 가로등
   F: { ground: town(25), solid: true, light: true, fire: true },  // 모닥불
