@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createFight, update, swing, dodge, holySlash, PLAYER_MAX_HP, ENEMY_HP, ENEMY_REACH, ENEMY_SPEED, SWING_COOLDOWN, HOLY_GAUGE } from '../src/combat.js';
+import { createFight, update, swing, dodge, holySlash, PLAYER_MAX_HP, ENEMY_HP, ENEMY_REACH, ENEMY_SPEED, SWING_COOLDOWN, HOLY_GAUGE,
+  THROWER_HP, CHARGER_HP, THROW_EVERY, CHARGE_WINDUP, STUN_TIME } from '../src/combat.js';
 
 const P = { x: 0, z: 0, facing: 0 };   // +z를 바라본다
 
@@ -63,7 +64,8 @@ test('체력이 다 떨어지면 진다', () => {
 test('멈춘 시간: 적은 움직이지 않고, 제한 시간이 지나면 진다', () => {
   const f = createFight({ enemies: [[0, 1]], frozen: true, enemyHp: 1, timeLimit: 2 });
   assert.deepEqual(update(f, 1, P), []);
-  assert.deepEqual(f.enemies[0], { x: 0, z: 1, hp: 1, cd: 0, windup: 0 });
+  const e = f.enemies[0];
+  assert.deepEqual([e.x, e.z, e.hp, e.windup], [0, 1, 1, 0]);
   assert.deepEqual(update(f, 1, P), ['lost']);
 });
 
@@ -121,4 +123,66 @@ test('위(북쪽)를 보면 z가 작은 쪽으로 나간다', () => {
   const f = createFight({ enemies: [[0, -3], [0, 3]], enemyHp: 5 });
   f.gauge = HOLY_GAUGE;
   assert.deepEqual(holySlash(f, { x: 0, z: 0, facing: Math.PI }), ['holy', 'hit:0']);
+});
+
+test('종류별 체력(걸음꾼 3·투척꾼 2·돌진꾼 4), 시작 체력을 줄 수 있다', () => {
+  const f = createFight({ enemies: [[0, 5], [1, 5, 'thrower'], [2, 5, 'charger']] }, 2);
+  assert.deepEqual(f.enemies.map(e => [e.kind, e.hp]), [['walker', ENEMY_HP], ['thrower', THROWER_HP], ['charger', CHARGER_HP]]);
+  assert.equal(f.hp, 2);
+});
+
+test('투척꾼: 가까우면 물러나고(막힌 칸으로는 못 감), 거리를 두고 오물을 던진다', () => {
+  const f = createFight({ enemies: [[0, 2, 'thrower']] });
+  update(f, 0.1, P);
+  assert.ok(f.enemies[0].z > 2, '물러난다');
+  const g = createFight({ enemies: [[0, 2, 'thrower']] });
+  update(g, 0.1, P, (x, z) => z >= 2);
+  assert.equal(g.enemies[0].z, 2, '뒤가 막혀 있으면 그대로');
+  const h = createFight({ enemies: [[0, 5, 'thrower']] });
+  update(h, THROW_EVERY, P);
+  assert.equal(h.shots.length, 1);
+  assert.equal(h.enemies[0].z, 5, '알맞은 거리에서는 서 있다');
+});
+
+test('오물: 날아와 맞으면 1피해, 피하는 중이면 지나가고, 막힌 칸이나 사거리 끝에서 사라진다', () => {
+  const f = createFight({ enemies: [[0, 5, 'thrower']] });
+  update(f, THROW_EVERY, P);
+  let hurt = 0;
+  for (let i = 0; i < 20; i++) hurt += update(f, 0.05, P).filter(e => e === 'hurt').length;
+  assert.equal(hurt, 1);
+  assert.equal(f.hp, PLAYER_MAX_HP - 1);
+  const g = createFight({ enemies: [[0, 5, 'thrower']] });
+  update(g, THROW_EVERY, P);
+  for (let i = 0; i < 14; i++) update(g, 0.05, P);   // 오물이 코앞(0.8칸)까지 온다
+  dodge(g);
+  for (let i = 0; i < 10; i++) update(g, 0.05, P);
+  assert.equal(g.hp, PLAYER_MAX_HP, '피하는 중에는 지나간다');
+  const w = createFight({ enemies: [[0, 5, 'thrower']] });
+  update(w, THROW_EVERY, P, (x, z) => z === 3);
+  update(w, 0.3, P, (x, z) => z === 3);
+  assert.equal(w.shots.length, 0, '벽에서 사라짐');
+});
+
+test('돌진꾼: 같은 줄이면 준비 뒤 돌진해 1피해, 막힌 칸에 부딪히면 기절한다', () => {
+  const f = createFight({ enemies: [[0, 4, 'charger']] });
+  assert.deepEqual(update(f, 0.01, P), ['windup:0']);
+  update(f, CHARGE_WINDUP, P);
+  const ev = [];
+  for (let i = 0; i < 10; i++) ev.push(...update(f, 0.05, P));
+  assert.equal(ev.filter(e => e === 'hurt').length, 1);
+  const g = createFight({ enemies: [[0, 4, 'charger']] });
+  update(g, 0.01, P, (x, z) => z === 2);
+  update(g, CHARGE_WINDUP, P, (x, z) => z === 2);
+  const ev2 = [];
+  for (let i = 0; i < 5; i++) ev2.push(...update(g, 0.05, P, (x, z) => z === 2));
+  assert.ok(ev2.includes('stun:0'));
+  const z = g.enemies[0].z;
+  update(g, STUN_TIME / 2, P, (x, z2) => z2 === 2);
+  assert.equal(g.enemies[0].z, z, '기절 중에는 그대로');
+});
+
+test('돌진꾼: 줄이 안 맞으면 줄을 맞추러 움직인다(차이가 작은 축부터)', () => {
+  const f = createFight({ enemies: [[3, 1.5, 'charger']] });
+  update(f, 0.1, P);
+  assert.ok(f.enemies[0].z < 1.5 && f.enemies[0].x === 3);
 });
