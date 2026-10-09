@@ -4,7 +4,7 @@ import { REGIONS, FIGHTS } from '../data/regions.js';
 import { TILES, STAMPS } from '../data/tiles.js';
 import { SPRITES } from '../data/sprites.js';
 import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave, has } from './story.js';
-import { triggersFor, actorsFor, blockedFor, lightFor, matches, fieldFightsFor, herbsFor } from './region.js';
+import { triggersFor, actorsFor, blockedFor, lightFor, matches, fieldFightsFor, fieldFightAt, herbsFor } from './region.js';
 import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
 import { createWalker, step, dash, front, standing, pressing, OPPOSITE, DIRS } from './player.js';
@@ -109,9 +109,9 @@ function eatHerb(c) {
 }
 
 function checkTriggers() {
-  // 필드 전투: 맵에 서 있는 무리의 원 안에 들어오면 그 자리에서 시작한다
-  const field = fieldFightsFor(FIGHTS, state.region, state).find(([, d]) => dist(hero, d.field) <= d.field.r);
-  if (field) return startField(field[0]);
+  // 필드 전투: 맵에 서 있는 무리의 원 안에 들어오거나 무리에 다가가면 그 자리에서 시작한다
+  const field = fieldFightAt(FIGHTS, state.region, state, hero);
+  if (field) return startField(field);
   const auto = triggersFor(region(), state).find(t => t.auto && dist(hero, t) <= t.r);
   if (auto) return openDialogue(auto.node, auto);
   const f = front(hero), dev = puzzleOn() && deviceAt(puzzle, f.x, f.z);

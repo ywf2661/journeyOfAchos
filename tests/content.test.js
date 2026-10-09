@@ -4,7 +4,7 @@ import { SCRIPT, MEMORIES } from '../data/script.js';
 import { REGIONS, FIGHTS } from '../data/regions.js';
 import { SPRITES } from '../data/sprites.js';
 import { createState, createDialogue, applyEffect, winFight, markDone, has } from '../src/story.js';
-import { triggersFor, matches } from '../src/region.js';
+import { triggersFor, matches, fieldFightsFor } from '../src/region.js';
 import { applySolved } from '../src/puzzle.js';
 import { dist } from '../src/geom.js';
 
@@ -95,6 +95,13 @@ function playthrough({ pickTrigger, pickChoice, flags = [] }) {
     if (pz && matches(pz, state) && !has(state, `solved:${pz.id}`)) {
       const say = applySolved(state, pz);
       if (say) run(say);
+      continue;
+    }
+    // 필드 전투도 나오면 바로 이긴 것으로 친다(길목이라 피해 갈 수 없다 — maps.test.js)
+    const [field] = fieldFightsFor(FIGHTS, state.region, state);
+    if (field) {
+      state.pendingFight = field[0];
+      run(winFight(state, FIGHTS));
       continue;
     }
     const avail = triggersFor(REGIONS[state.region], state);

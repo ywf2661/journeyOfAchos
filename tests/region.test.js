@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../src/story.js';
-import { matches, lightFor, actorsFor, triggersFor, blockedFor, fieldFightsFor, herbsFor } from '../src/region.js';
+import { matches, lightFor, actorsFor, triggersFor, blockedFor, fieldFightsFor, fieldFightAt, herbsFor } from '../src/region.js';
 import { parseMap } from '../src/map.js';
 
 const REGION = {
@@ -74,4 +74,13 @@ test('herbsFor: 아직 먹지 않은 약초', () => {
   s.flags.push('done:h1');
   assert.deepEqual(herbsFor(r, s).map(h => h.id), ['h2']);
   assert.deepEqual(herbsFor({}, s), []);
+});
+
+test('fieldFightAt: 원 안이거나, 서 있는 적에게 1.5칸 안으로 다가가면 그 필드 전투', () => {
+  const fights = { a: { region: 1, field: { x: 0, z: 0, r: 2 }, enemies: [[5, 0], [0, -6, 'thrower']] } }, s = createState();
+  assert.equal(fieldFightAt(fights, 1, s, { x: 0, z: 1 }), 'a');
+  assert.equal(fieldFightAt(fights, 1, s, { x: 4, z: 0.5 }), 'a');
+  assert.equal(fieldFightAt(fights, 1, s, { x: 3, z: 3 }), null);
+  s.flags.push('won:a');
+  assert.equal(fieldFightAt(fights, 1, s, { x: 0, z: 0 }), null);
 });

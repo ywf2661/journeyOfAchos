@@ -112,15 +112,21 @@ test('엔딩 길(새벽의 다리)을 자동으로 걷는 데 30초 넘게 걸�
   assert.ok(steps / AUTO >= 30, `${steps}칸 ÷ 초당 ${AUTO}칸 = ${(steps / AUTO).toFixed(1)}초`);
 });
 
-// 필드 전투는 다음 이야기로 가는 길목: 원 안을 막으면 from에서 to로 못 간다(원을 안 막으면 간다)
-const FIELD_PATHS = { road_field: [[0, -12], [2, -19]], forest_field: [[0, 15], [-6, 0]], village_field: [[0, -3], [-7, -12]], valley_field: [[-6, -5], [0, 10]] };
-test('필드 전투는 지역마다 하나이고, 피해 갈 수 없는 길목에 있다', () => {
+// 필드 전투가 지키는 다음 이야기 트리거와, 싸운 직후 아코스가 오는 칸. 이어하기(지역 시작 칸)에서도 본다.
+const FIELD_GUARDS = { road_field: ['r1_traveler', [0, -12]], forest_field: ['r4_ambush', [0, 15]], village_field: ['r5_leave', [0, -3]], valley_field: ['r2_alarm', [-6, -5]] };
+// 그 칸들에서 트리거가 열리나(자동은 반경 안, 말 걸기는 앞 칸이 1.5칸 안)
+const opens = (t, cells) => t.auto
+  ? cells.some(c => dist(c, t) <= t.r)
+  : cells.some(c => STEPS.some(([dx, dz]) => dist({ x: c.x + dx, z: c.z + dz }, t) <= 1.5));
+test('필드 전투는 지역마다 하나이고, 이기기 전에는 다음 이야기로 갈 수 없다(원을 피해 가거나 이어하기로 건너뛰지 못한다)', () => {
   const fields = Object.entries(FIGHTS).filter(([, f]) => f.field);
   assert.deepEqual(fields.map(([, f]) => f.region).sort(), [1, 2, 4, 5]);
   for (const [id, f] of fields) {
-    const [from, to] = FIELD_PATHS[id], has = cells => cells.some(c => c.x === to[0] && c.z === to[1]);
-    assert.ok(has(reachable(f.region, from)), `${id}: 원래는 간다`);
-    assert.ok(!has(reachable(f.region, from, (x, z) => Math.hypot(x - f.field.x, z - f.field.z) <= f.field.r)), `${id}: 피해 간다`);
+    const [tid, after] = FIELD_GUARDS[id], r = REGIONS[f.region], t = r.triggers.find(x => x.id === tid);
+    if (t.if === `won:${id}`) continue;   // 이겨야 열리는 트리거
+    const circle = (x, z) => Math.hypot(x - f.field.x, z - f.field.z) <= f.field.r;
+    assert.ok(opens(t, reachable(f.region, after)), `${id}: 원을 안 막으면 ${tid}에 닿는다`);
+    for (const from of [after, [r.start.x, r.start.z]]) assert.ok(!opens(t, reachable(f.region, from, circle)), `${id}: ${from}에서 원을 피해 ${tid}`);
   }
 });
 

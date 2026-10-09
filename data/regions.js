@@ -254,7 +254,8 @@ export const REGIONS = {
       { id: 'r2_d2_talk', node: 'r2_d2_talk', x: -7, z: -6, r: 3, day: 2, label: '마술사에게 말을 건다' },
       { id: 'r2_mem_falls', node: 'r2_mem_falls', x: -9, z: -5, r: 3, day: 2, if: 'done:r2_d2_talk', label: '멈춘 폭포 아래를 걷는다' },
       { id: 'r2_mem_ring', node: 'r2_mem_ring', x: 9, z: -2, r: 3, day: 2, if: 'soldiers', label: '바위에 앉아 쉰다' },
-      { id: 'r2_alarm', node: 'r2_alarm', x: 0, z: 10, r: 4, day: 2, if: 'done:r2_d2_talk', auto: true, ends: true },
+      // 경보: 개울 북쪽의 필드 전투(마술사와 이야기한 뒤 나온다)를 이겨야 — 이어하기로 남쪽에서 시작해도 건너뛰지 못하게
+      { id: 'r2_alarm', node: 'r2_alarm', x: 0, z: 10, r: 4, day: 2, if: 'won:valley_field', auto: true, ends: true },
       { id: 'r2_mem_stars', node: 'r2_mem_stars', x: -6, z: -11, r: 3, day: 3, label: '풀밭에 누워 별을 본다' },
       { id: 'r2_mem_clock', node: 'r2_mem_clock', x: 3, z: -10, r: 2.5, day: 3, label: '멈춘 괘종시계를 살핀다' },
       { id: 'r2_d3_night', node: 'r2_d3_night', x: 0, z: -9, r: 3, day: 3, ends: true, label: '마술사에게 말을 건다' },
