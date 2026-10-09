@@ -28,7 +28,7 @@ export const REGIONS = {
       'T.......,..===.f____f...T',
       'TB...,...,.===.f_b__R...T',
       'T....,P....===.f____....T',
-      'T........l.===.f____....T',
+      'T........l.===..____....T',
       'T..........===.f____f...T',
       'T,.,.......===.ff=fff...T',
       'T.=====================.T',
@@ -66,7 +66,7 @@ export const REGIONS = {
     // 퍼즐 ①: 성벽 안쪽 마당의 평형추 돌 둘을 발판 둘에 올리면 성문이 열린다(gate_open)
     puzzle: {
       id: 'r1_gate', if: 'gate_jam',
-      boulders: [[5, -7], [6, -7]], plates: [[4, -9], [7, -9]], reset: [2, -6],
+      boulders: [[5, -7], [6, -7]], plates: [[4, -9], [7, -9]], reset: [3, -6],   // 울타리 사이: 마당 안(4,-6)·밖(2,-6) 어느 쪽에서도 친다
       set: 'gate_open', say: 'r1_gate_open',
     },
     actors: [
@@ -109,7 +109,7 @@ export const REGIONS = {
       'P.PT.D....TTTT===DDTPPP',
       '.T.D======T======DPT...',
       'PPDP=========x===T.PPTT',
-      '..D.=============TP..TP',
+      '..D.======D======TP..TP',
       'PPPT===TTTTTPPTDPT.PPP.',
       '...P===PPTTT..DD.TT...D',
       'DPD.===..PPTPTPPTTDTPPD',
@@ -144,7 +144,7 @@ export const REGIONS = {
     // 퍼즐 ②: 무너진 길의 구덩이 둘을 북쪽 빈터의 바위로 메운다
     puzzle: {
       id: 'r4_pit',
-      boulders: [[-3, -8], [-4, -7], [-2, -7]], pits: [[-1, -5], [-1, -4]], reset: [-5, -7],
+      boulders: [[-3, -8], [-4, -7], [-2, -7]], pits: [[-1, -5], [0, -5]], reset: [-5, -7],   // 한 칸 폭 길에 나란히: 하나만 메워서는 못 건넌다
       say: 'r4_pit_done',
     },
   },

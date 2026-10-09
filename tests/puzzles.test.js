@@ -36,7 +36,7 @@ function walkable(start, blocked) {
 // 밀기 퍼즐 풀이기: (아코스 칸, 돌, 메운 구덩이)를 밀기 수가 적은 순으로 탐색(0-1 넓이 우선). 최소 밀기 수, 못 풀면 null.
 // 아코스는 퍼즐 둘레 상자(장치에서 MARGIN칸) 안에서만 움직인다. 들어오는 칸은 지역 시작점에서 걸어서 닿는 상자 안 칸.
 // MARGIN 4: ① 마당 문으로 들어가려면 장치에서 4칸 떨어진 골목(z -3)을 지나야 한다.
-function solvePush(k) {
+function area(k) {
   const { r, base } = setup(k);
   const p0 = createPuzzle(r.puzzle);
   const objs = [...r.puzzle.boulders, ...(r.puzzle.plates ?? []), ...(r.puzzle.pits ?? [])];
@@ -46,7 +46,12 @@ function solvePush(k) {
   const reach = walkable([r.start.x, r.start.z], blockedWith(p0, base));
   const start = [...reach].map(s => s.split(',').map(Number)).find(([x, z]) => inBox(x, z));
   assert.ok(start, `${r.name}: 퍼즐에 다가갈 수 없다`);
-  const clone = p => ({ ...p, boulders: p.boulders.map(b => ({ ...b })), filled: [...p.filled] });
+  return { r, base, p0, inBox, start };
+}
+const clone = p => ({ ...p, boulders: p.boulders.map(b => ({ ...b })), filled: [...p.filled] });
+
+function solvePush(k) {
+  const { base, p0, inBox, start } = area(k);
   const key = ([hx, hz], p) => `${hx},${hz}|${p.boulders.map(b => `${b.x},${b.z}`).sort().join(';')}|${p.filled.join()}`;
   const best = new Map([[key(start, p0), 0]]), dq = [{ hero: start, p: p0, pushes: 0 }];
   while (dq.length) {
@@ -70,6 +75,35 @@ function solvePush(k) {
     }
   }
   return null;
+}
+
+// 밀기 퍼즐에서 닿을 수 있는 모든 상태: (돌 자리, 메운 구덩이, 아코스가 밀지 않고 걸어 다니는 상자 안 칸들).
+// 상태마다 한 번 밀어서 가는 다음 상태 번호(next)를 단다. 풀린 상태에서는 더 밀지 않는다.
+function pushStates(k) {
+  const { base, p0, inBox, start } = area(k);
+  const region = (p, from) => walkable(from, (x, z) => !inBox(x, z) || blockedWith(p, base)(x, z));
+  const states = [], index = new Map();
+  const add = (p, from) => {
+    const cells = region(p, from);
+    const key = `${[...cells].sort()[0]}|${p.boulders.map(b => `${b.x},${b.z}`).sort().join(';')}|${p.filled.join()}`;
+    if (!index.has(key)) { index.set(key, states.length); states.push({ p, cells, next: [] }); }
+    return index.get(key);
+  };
+  add(p0, start);
+  for (let i = 0; i < states.length; i++) {
+    const { p, cells } = states[i];
+    if (p.solved) continue;
+    for (const c of cells) {
+      const [hx, hz] = c.split(',').map(Number);
+      for (const [dx, dz] of STEPS4) {
+        const nx = hx + dx, nz = hz + dz;
+        if (!inBox(nx, nz) || !p.boulders.some(b => b.x === nx && b.z === nz)) continue;
+        const q = clone(p);
+        if (push(q, nx, nz, dx, dz, base).length) states[i].next.push(add(q, [nx, nz]));
+      }
+    }
+  }
+  return states;
 }
 
 test('① 성문 평형추: 시작점에서 다가가 풀 수 있고, 다섯 번 넘게 밀어야 한다', () => {
@@ -108,6 +142,27 @@ test('퍼즐을 풀기 전에는 그 너머로 갈 수 없다(돌아가는 길�
     const { r, base } = setup(k);
     const reach = walkable([r.start.x, r.start.z], blockedWith(createPuzzle(r.puzzle), base));
     assert.ok(!reach.has(beyond), `${r.name}: ${beyond}`);
+  }
+});
+
+test('밀기 퍼즐은 어떻게 밀어도, 풀기 전에는 그 너머로 갈 수 없다(구덩이 하나만 메우고 건너기 등)', () => {
+  for (const [k, beyond] of [[1, '0,-11'], [4, '1,-5']]) {
+    const bad = pushStates(k).filter(s => !s.p.solved && s.cells.has(beyond));
+    assert.equal(bad.length, 0, `${REGIONS[k].name}: 안 풀린 채 ${beyond}에 닿는 상태 ${bad.length}개`);
+  }
+});
+
+test('밀기 퍼즐은 어떻게 꼬여도 풀거나 다시 놓기 돌 앞에 설 수 있다(돌 사이에 갇히지 않는다)', () => {
+  for (const k of [1, 4]) {
+    const states = pushStates(k), [rx, rz] = REGIONS[k].puzzle.reset;
+    const ok = states.map(s => s.p.solved || STEPS4.some(([dx, dz]) => s.cells.has(`${rx + dx},${rz + dz}`)));
+    // 거꾸로: 좋은 상태로 한 번 밀어 갈 수 있는 상태도 좋은 상태
+    for (let changed = true; changed;) {
+      changed = false;
+      states.forEach((s, i) => { if (!ok[i] && s.next.some(j => ok[j])) ok[i] = changed = true; });
+    }
+    const stuck = ok.filter(v => !v).length;
+    assert.equal(stuck, 0, `${REGIONS[k].name}: 빠져나올 수 없는 상태 ${stuck}개 / ${states.length}`);
   }
 });
 
