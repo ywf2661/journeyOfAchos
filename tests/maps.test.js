@@ -55,21 +55,22 @@ test('인물은 정해 둔 그림을 쓰고, 막히지 않은 정수 칸에 선�
 
 test('시작 위치와 전투 시작 위치는 4방향 이름을 가진다(3D 판 저장도 이어서 할 수 있게)', () => {
   for (const r of Object.values(REGIONS)) assert.ok(DIRS[r.start.dir], r.name);
-  for (const [id, f] of Object.entries(FIGHTS)) assert.ok(DIRS[f.player[2]], id);
+  for (const [id, f] of Object.entries(FIGHTS)) if (f.player) assert.ok(DIRS[f.player[2]], id);
 });
 
 // 시작 칸에서 4방향으로 걸어서 갈 수 있는 칸. 인물 칸은 막힌 것으로, 조건부 차단 칸(문)은 열린 것으로,
 // 퍼즐은 푼 모습(돌은 발판·구덩이, 낙엽 다리)으로 본다. 퍼즐이 실제로 풀리는지는 puzzles.test.js.
-function reachable(k) {
+// from: 시작 칸(없으면 지역 시작), extra(x, z): 더 막을 칸
+function reachable(k, from = [REGIONS[k].start.x, REGIONS[k].start.z], extra = () => false) {
   const r = REGIONS[k], m = MAPS[k];
   const pz = r.puzzle && createPuzzle(r.puzzle, true);
   const actors = new Set(r.actors.map(a => `${a.x},${a.z}`));
   const ok = (x, z) => {
-    if (actors.has(`${x},${z}`)) return false;
+    if (actors.has(`${x},${z}`) || extra(x, z)) return false;
     const v = pz ? blockedBy(pz, x, z) : null;
     return v === null ? !isSolid(m, x, z) : !v;
   };
-  const seen = new Set([`${r.start.x},${r.start.z}`]), queue = [[r.start.x, r.start.z]];
+  const seen = new Set([from.join()]), queue = [from];
   while (queue.length) {
     const [x, z] = queue.shift();
     for (const [dx, dz] of STEPS) {
@@ -98,7 +99,8 @@ test('전투 시작 칸과 적 칸이 막혀 있지 않다', () => {
   for (const [id, f] of Object.entries(FIGHTS)) {
     const m = MAPS[f.region];
     assert.ok(m, `${id}: 지역 ${f.region}`);
-    assert.ok(!isSolid(m, f.player[0], f.player[1]), id);
+    const [px, pz] = f.player ?? [f.field.x, f.field.z];   // 필드 전투는 그 자리에서 시작한다(원의 가운데)
+    assert.ok(!isSolid(m, px, pz), id);
     for (const [x, z] of f.enemies) assert.ok(!isSolid(m, x, z), `${id}: (${x}, ${z})`);
   }
 });
@@ -108,4 +110,24 @@ test('엔딩 길(새벽의 다리)을 자동으로 걷는 데 30초 넘게 걸�
   let steps = 0;
   while (!isSolid(m, r.start.x, r.start.z - steps - 1)) steps++;
   assert.ok(steps / AUTO >= 30, `${steps}칸 ÷ 초당 ${AUTO}칸 = ${(steps / AUTO).toFixed(1)}초`);
+});
+
+// 필드 전투는 다음 이야기로 가는 길목: 원 안을 막으면 from에서 to로 못 간다(원을 안 막으면 간다)
+const FIELD_PATHS = { road_field: [[0, -12], [2, -19]], forest_field: [[0, 15], [-6, 0]], village_field: [[0, -3], [-7, -12]], valley_field: [[-6, -5], [0, 10]] };
+test('필드 전투는 지역마다 하나이고, 피해 갈 수 없는 길목에 있다', () => {
+  const fields = Object.entries(FIGHTS).filter(([, f]) => f.field);
+  assert.deepEqual(fields.map(([, f]) => f.region).sort(), [1, 2, 4, 5]);
+  for (const [id, f] of fields) {
+    const [from, to] = FIELD_PATHS[id], has = cells => cells.some(c => c.x === to[0] && c.z === to[1]);
+    assert.ok(has(reachable(f.region, from)), `${id}: 원래는 간다`);
+    assert.ok(!has(reachable(f.region, from, (x, z) => Math.hypot(x - f.field.x, z - f.field.z) <= f.field.r)), `${id}: 피해 간다`);
+  }
+});
+
+test('약초는 지역마다 하나, 걸어서 닿는 빈칸에 있다', () => {
+  for (const k of [1, 2, 4, 5]) {
+    const [h] = REGIONS[k].herbs ?? [];
+    assert.ok(h, REGIONS[k].name);
+    assert.ok(reachable(k).some(c => c.x === h.x && c.z === h.z), `${REGIONS[k].name}: ${h.id}`);
+  }
 });

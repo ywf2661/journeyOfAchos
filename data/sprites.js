@@ -17,4 +17,6 @@ export const SPRITES = {
   refugee: { art: ['dungeon', 88] },                     // 검은 숲길: 피난 가는 어머니
   child: { art: ['dungeon', 98] },
   elder: { art: ['dungeon', 100] },                      // 버려진 마을: 홀로 남은 노파
+  thrower: { art: ['dungeon', 108], tint: '#2c3a1a' },   // 투척꾼: 오물을 던지는 덩어리(어두운 녹색)
+  charger: { art: ['dungeon', 124], tint: '#3a1814' },   // 돌진꾼: 역병에 먹힌 짐승(어두운 적갈색)
 };

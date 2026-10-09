@@ -11,6 +11,7 @@ export const REGIONS = {
     light: 'night',
     bounds: { minX: -12, maxX: 12, minZ: -22, maxZ: 21 },
     start: { x: 0, z: 19, dir: 'up' },
+    herbs: [{ id: 'r1_herb', x: -6, z: -15 }],      // 약초: 다친 채로 밟으면 ♥+1(성문 밖 들판)
     map: [
       'TTTTTTTTTTTTTTTTTTTTTTTTT',
       'TxDD.......x........D.x.T',
@@ -95,6 +96,7 @@ export const REGIONS = {
     light: 'day',
     bounds: { minX: -11, maxX: 11, minZ: -17, maxZ: 16 },
     start: { x: 0, z: 15, dir: 'up' },
+    herbs: [{ id: 'r4_herb', x: -7, z: -1 }],       // 서쪽 빈터에서 무너진 길로 가는 오솔길
     map: [
       'DPPPPTPTDDPPPPDTDDTPDPT',
       'D....P.PPP....=s=TP.D.D',
@@ -154,6 +156,7 @@ export const REGIONS = {
     light: 'dusk',
     bounds: { minX: -13, maxX: 13, minZ: -13, maxZ: 13 },
     start: { x: 0, z: 12, dir: 'up' },
+    herbs: [{ id: 'r5_herb', x: -11, z: -5 }],      // 우물 광장 서쪽
     map: [
       'TTTTT=TTTTTTTTTTTTTTTTTTTTT',
       'TD..===............,......T',
@@ -206,6 +209,7 @@ export const REGIONS = {
     light: { 1: 'dusk', 2: 'day', 3: 'night' },
     bounds: { minX: -15, maxX: 15, minZ: -15, maxZ: 15 },
     start: { x: 0, z: 3, dir: 'up' },   // 경보(r2_alarm, 입구 z 10)와 떨어뜨린다 — 이어하기가 여기서 시작한다
+    herbs: [{ id: 'r2_herb', x: -6, z: -2 }],       // 개울 북쪽 둑
     map: [
       'MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM',
       'MQQYQQQ.*Y,YYQK..YYQY*Y*.YY*YQM',
@@ -318,11 +322,23 @@ export const REGIONS = {
   },
 };
 
+// 적: [x, z, 종류]. 종류는 걸음꾼(없으면)·투척꾼(thrower)·돌진꾼(charger) — src/combat.js.
+// field가 있으면 필드 전투: 적이 맵에 서 있고, 아코스가 원(field) 안에 들어오면 그 자리에서 시작한다. 다음 이야기로 가는 길목에 둔다.
 export const FIGHTS = {
+  road_field: { region: 1, if: 'won:road', field: { x: 2, z: -20, r: 3 }, enemies: [[-1, -19], [5, -19], [6, -16, 'thrower']], then: 'r1_field_after' },   // 나그네를 에워싼 무리
+  forest_field: { region: 4, field: { x: -3, z: 5, r: 2.5 }, enemies: [[-7, 4, 'charger'], [-7, 6, 'charger']], then: 'r4_field_after' },   // 서쪽 빈터의 짐승
+  village_field: {
+    region: 5, if: 'won:village', field: { x: -8, z: -11, r: 3 },              // 마을을 나가는 길목
+    enemies: [[-11, -11, 'thrower'], [-5, -11, 'thrower'], [-9, -9], [-7, -9]], then: 'r5_field_after',
+  },
+  valley_field: {
+    region: 2, day: 2, if: 'done:r2_d2_talk', field: { x: 0, z: -3, r: 2.5 },  // 마술사와 이야기한 뒤, 개울을 건너 남쪽(경보)으로 가는 길
+    enemies: [[-4, -2, 'charger'], [2, -2], [6, -2, 'thrower']], then: 'r2_field_after',
+  },
   road: { region: 1, enemies: [[-3, -17], [3, -18]], player: [0, -12, 'up'], then: 'r1_road_after' },
   forest: { region: 4, enemies: [[1, -13], [7, -13], [4, -14]], player: [4, -9, 'up'], then: 'r4_ambush_after' },
   village: { region: 5, enemies: [[-3, -5], [3, -5], [-2, -6], [2, -6]], player: [0, -1, 'up'], then: 'r5_well_after' },
-  valley: { region: 2, enemies: [[-5, 12], [0, 14], [5, 12]], player: [0, 5, 'down'], then: 'r2_valley_after' },
+  valley: { region: 2, enemies: [[-5, 12, 'charger'], [0, 14, 'thrower'], [5, 12]], player: [0, 5, 'down'], then: 'r2_valley_after' },
   freeze: {
     region: 2, enemies: [[-8, 10], [-4, 13], [0, 8], [4, 12], [8, 9], [0, 14]],
     frozen: true, enemyHp: 1, timeLimit: 25, player: [0, 4, 'down'], then: 'r2_freeze_after',
