@@ -18,10 +18,8 @@ export const TILES = {
   '+': { ground: dun(37) },                                       // 나무 다리
   '~': { ground: bat(37), solid: true },                          // 물
   W: { ground: bat(75), solid: true },                            // 멈춘 폭포
-  T: { ground: town(0), top: town(28), solid: true },             // 초록 나무
-  t: { ground: town(0), top: town(16), solid: true },             // 작은 초록 나무
-  Y: { ground: town(0), top: town(3), solid: true },              // 단풍 나무
-  y: { ground: town(0), top: town(15), solid: true },             // 작은 단풍 나무
+  T: { ground: town(0), top: town(28), solid: true },             // 초록 나무(한 칸짜리 완성 그림)
+  Y: { ground: town(0), top: town(27), solid: true },             // 단풍 나무(한 칸짜리 완성 그림)
   D: { ground: town(0), top: farm(2), solid: true },              // 앙상한 나무
   M: { ground: town(0), top: bat(5), solid: true },               // 산
   o: { ground: town(0), top: farm(89), solid: true },             // 바위
@@ -33,6 +31,8 @@ export const TILES = {
   n: { ground: town(0), top: town(67), solid: true },             // 격리 천막
   e: { ground: town(0), top: dun(72), solid: true },              // 병상
   k: { ground: town(0), top: dun(63), solid: true },              // 괘종시계
+  s: { ground: town(25), top: town(83), solid: true },            // 표지판
+  q: { ground: town(0), top: dun(64), solid: true },              // 무덤
   l: { ground: town(0), top: dun(29), solid: true, light: true }, // 가로등
   F: { ground: town(25), solid: true, light: true, fire: true },  // 모닥불
   '#': { ground: town(0), top: town(126), solid: true },          // 성벽
@@ -48,4 +48,7 @@ export const STAMPS = {
   B: { ground: town(25), rows: rows(town, [[52, 53, 53, 54], [64, 65, 67, 66], [76, 88, 90, 79]]) },           // 큰 돌집(병영·교회·주막) 4×3
   C: { ground: town(109), rows: rows(town, [[99, 100, 100, 101, 101, 102], [126, 125, 111, 112, 125, 126]]) }, // 성 6×2
   K: { ground: town(0), rows: rows(town, [[99, 100, 102], [126, 125, 126], [126, 126, 126], [126, 103, 126]]) }, // 탑 3×4
+  // 큰 나무는 위 칸(우듬지)과 아래 칸(줄기)으로 나뉜 그림이라 두 칸을 함께 찍는다. 한쪽만 쓰면 잘려 보인다.
+  P: { ground: town(0), rows: rows(town, [[4], [16]]) },                                                         // 큰 초록 나무 1×2
+  Q: { ground: town(0), rows: rows(town, [[3], [15]]) },                                                         // 큰 단풍 나무 1×2
 };

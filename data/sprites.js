@@ -8,4 +8,7 @@ export const SPRITES = {
   guard: { art: ['dungeon', 87] },
   traveler: { art: ['dungeon', 112] },
   plague: { art: ['dungeon', 85], tint: '#1a1814' },     // 역병에 먹힌 사람: 검게 굳었다
+  refugee: { art: ['dungeon', 88] },                     // 검은 숲길: 피난 가는 어머니
+  child: { art: ['dungeon', 98] },
+  elder: { art: ['dungeon', 100] },                      // 버려진 마을: 홀로 남은 노파
 };

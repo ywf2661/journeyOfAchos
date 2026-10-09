@@ -1,6 +1,6 @@
 // 포켓몬식 칸 이동: 4방향, 한 칸씩. 순수 함수(DOM 없음).
 // 좌표 1 = 한 칸. 방향각은 geom.js 규약(앞 = (sin θ, cos θ))이라 전투 규칙(inArc)에 그대로 쓴다.
-export const WALK = 4, RUN = 8, DASH = 14, AUTO = 1.3;   // 칸/초
+export const WALK = 4, RUN = 8, DASH = 14, AUTO = 0.9;   // 칸/초. AUTO는 엔딩에서 둘이 천천히 걷는 속도
 export const TURN = 0.08;   // 선 자리에서 돌아설 때, 이보다 짧게 누르면 방향만 바꾼다(초)
 export const DIRS = {
   up: { dx: 0, dz: -1, facing: Math.PI },

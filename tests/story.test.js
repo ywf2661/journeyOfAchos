@@ -142,6 +142,15 @@ test('저장하고 불러오면 같은 상태다(진행 중인 전투 포함)', 
   assert.deepEqual(loadGame(st), s);
 });
 
+test('새로 넣은 지역 4·5(검은 숲길·버려진 마을)에서 한 저장도 불러온다', () => {
+  const st = memStorage();
+  for (const region of [4, 5]) {
+    const s = { ...createState(), region };
+    saveGame(st, s);
+    assert.deepEqual(loadGame(st), s);
+  }
+});
+
 test('저장이 없거나 깨졌거나 형식이 다르면 null', () => {
   const st = memStorage();
   assert.equal(loadGame(st), null);

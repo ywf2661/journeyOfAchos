@@ -4,7 +4,7 @@ import { REGIONS, FIGHTS } from '../data/regions.js';
 import { TILES, STAMPS, SHEETS } from '../data/tiles.js';
 import { SPRITES } from '../data/sprites.js';
 import { parseMap, isSolid } from '../src/map.js';
-import { DIRS } from '../src/player.js';
+import { DIRS, AUTO } from '../src/player.js';
 import { dist } from '../src/geom.js';
 
 const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
@@ -82,4 +82,11 @@ test('전투 시작 칸과 적 칸이 막혀 있지 않다', () => {
     assert.ok(!isSolid(m, f.player[0], f.player[1]), id);
     for (const [x, z] of f.enemies) assert.ok(!isSolid(m, x, z), `${id}: (${x}, ${z})`);
   }
+});
+
+test('엔딩 길(새벽의 다리)을 자동으로 걷는 데 30초 넘게 걸린다(회상 대사가 걷는 동안 나오게)', () => {
+  const r = REGIONS[3], m = MAPS[3];
+  let steps = 0;
+  while (!isSolid(m, r.start.x, r.start.z - steps - 1)) steps++;
+  assert.ok(steps / AUTO >= 30, `${steps}칸 ÷ 초당 ${AUTO}칸 = ${(steps / AUTO).toFixed(1)}초`);
 });

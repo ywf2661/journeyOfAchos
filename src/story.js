@@ -101,7 +101,7 @@ export function saveGame(storage, state) {
 const isStrings = a => Array.isArray(a) && a.every(x => typeof x === 'string');
 
 function isValidSave(s) {
-  return s?.v === 1 && [1, 2, 3].includes(s.region) && [1, 2, 3].includes(s.day)
+  return s?.v === 1 && [1, 2, 3, 4, 5].includes(s.region) && [1, 2, 3].includes(s.day)
     && isStrings(s.flags) && isStrings(s.memories)
     && (s.pendingFight === null || typeof s.pendingFight === 'string')
     && s.ended === false;

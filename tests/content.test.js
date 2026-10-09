@@ -8,7 +8,7 @@ import { triggersFor } from '../src/region.js';
 import { dist } from '../src/geom.js';
 
 const triggers = Object.values(REGIONS).flatMap(r => r.triggers);
-const EFFECT = /^(nextDay|ending|region:[123]|combat:(\w+))$/;
+const EFFECT = /^(nextDay|ending|region:[1-5]|combat:(\w+))$/;
 
 test('모든 next와 선택지가 있는 노드를 가리킨다', () => {
   const bad = [];
