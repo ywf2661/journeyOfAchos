@@ -3,11 +3,12 @@ import { SCRIPT, MEMORIES } from '../data/script.js';
 import { REGIONS, FIGHTS } from '../data/regions.js';
 import { TILES, STAMPS } from '../data/tiles.js';
 import { SPRITES } from '../data/sprites.js';
-import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave } from './story.js';
+import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave, has } from './story.js';
 import { triggersFor, actorsFor, blockedFor, lightFor, matches } from './region.js';
 import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
-import { createWalker, step, dash, front, OPPOSITE } from './player.js';
+import { createWalker, step, dash, front, standing, pressing, OPPOSITE, DIRS } from './player.js';
+import { createPuzzle, blockedBy, push, stepOn, toggleTime, tick as tickPuzzle, reset as resetPuzzle, deviceAt, applySolved, pieces } from './puzzle.js';
 import { frameOf, SLASH_TIME } from './anim.js';
 import { createFight, update as updateFight, swing, dodge, holySlash, PLAYER_MAX_HP, HOLY_CHARGE, HOLY_GAUGE } from './combat.js';
 import { createInput } from './input.js';
@@ -24,7 +25,8 @@ const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, pars
 const input = createInput({ onPress, onRelease });
 const WAVE_TIME = 0.3;   // 성휘참 빛 칼날이 4칸을 날아가는 시간(초)
 
-let renderer, state, hero, blocked;
+let renderer, state, hero, blocked, baseBlocked;
+let puzzle = null, lastCell = '';   // 이 지역의 퍼즐 상태, 아코스가 마지막으로 선 칸(순서 돌 밟기)
 let mode = 'title';   // title | loading | explore | dialogue | combat | end | error
 let dialogue = null, view = null, ending = false;
 let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   // heroSlash: 베기 동작이 끝날 때까지 남은 시간
@@ -35,7 +37,17 @@ let transitioning = false;
 const region = () => REGIONS[state.region];
 const map = () => MAPS[state.region];
 // 플래그가 바뀌면(성문이 열림, 인물이 나타남) 다시 만든다
-const refreshBlocked = () => { blocked = blockedFor(region(), map(), state); };
+const refreshBlocked = () => {
+  const base = blockedFor(region(), map(), state);
+  baseBlocked = base;
+  // 퍼즐 장치(돌·구덩이·멈춘 낙엽)가 맵보다 먼저 정한다
+  blocked = (x, z) => {
+    const v = puzzle ? blockedBy(puzzle, x, z) : null;
+    return v === null ? base(x, z) : v;
+  };
+};
+// 퍼즐을 지금 만질 수 있나(안 풀렸고 조건이 맞을 때)
+const puzzleOn = () => puzzle && !puzzle.solved && matches(puzzle.def, state);
 
 function fail(e) {
   console.error(e);
@@ -50,6 +62,9 @@ async function enterRegion() {
   await ui.fade(true);
   const s = region().start;
   hero = createWalker(s.x, s.z, s.dir);
+  const def = region().puzzle;
+  puzzle = def ? createPuzzle(def, has(state, `solved:${def.id}`)) : null;
+  lastCell = `${s.x},${s.z}`;
   refreshBlocked();
   transitioning = false;
   saveGame(storage, state);
@@ -72,6 +87,8 @@ function facingTrigger() {
 function checkTriggers() {
   const auto = triggersFor(region(), state).find(t => t.auto && dist(hero, t) <= t.r);
   if (auto) return openDialogue(auto.node, auto);
+  const f = front(hero), dev = puzzleOn() && deviceAt(puzzle, f.x, f.z);
+  if (dev) return ui.showPrompt(dev === 'clock' ? '시계 돌을 친다' : '돌을 처음 자리로 되돌린다');
   const t = facingTrigger();
   ui.showPrompt(t ? `${t.label}${t.ends ? ' (되돌릴 수 없음)' : ''}` : null);
 }
@@ -216,12 +233,26 @@ async function finish() {
 }
 
 // 버튼을 누르는 순간: 모드에 따라 Z·X·방향의 뜻이 다르다
+// 퍼즐 이벤트: 틀린 순서 알림, 시계 소리, 풀리면 플래그·저장·문 열기·나레이션
+function onPuzzle(events) {
+  if (events.includes('wrong')) ui.toast('돌판의 빛이 꺼졌다.');
+  if (events.includes('flow') || events.includes('stop')) ui.tick();
+  if (!events.includes('solved')) return;
+  const say = applySolved(state, puzzle.def);
+  saveGame(storage, state);
+  refreshBlocked();
+  if (say) openDialogue(say);
+}
+
 function onPress(b) {
   if (mode === 'dialogue') {
     if (b === 'z') confirm();
     else if (b === 'x') advance();
     else if (b === 'up' || b === 'down') ui.moveChoice(b === 'up' ? -1 : 1);
   } else if (mode === 'explore' && b === 'z') {
+    const f = front(hero), dev = puzzleOn() && deviceAt(puzzle, f.x, f.z);
+    if (dev === 'clock') return onPuzzle(toggleTime(puzzle));
+    if (dev === 'reset') { resetPuzzle(puzzle); ui.toast('돌을 처음 자리로 되돌렸다.'); return; }
     const t = facingTrigger();
     if (t) openDialogue(t.node, t);
   } else if (mode === 'combat') {
@@ -289,6 +320,7 @@ function render(dt) {
   });
   renderer.draw({
     map: map(), cam: hero, things, t: time, flash,
+    puzzle: puzzle && pieces(puzzle),
     waves: waves.map(w => ({ x: w.x, z: w.z, facing: w.facing, p: w.t / WAVE_TIME })),
     blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
     marks: mode === 'explore' && facingTrigger() ? [{ x: hero.x, z: hero.z }] : [],
@@ -307,8 +339,21 @@ function frame(now) {
     step(hero, { dir: 'up', auto: true }, dt, (x, z) => isSolid(map(), x, z));
   } else if (hero && (mode === 'explore' || mode === 'combat')) {
     if (charge !== null) charge += dt;
-    step(hero, { ...input.state(), slow: mode === 'combat' && charge !== null }, dt, blocked);   // 모으는 동안은 반 속도
+    const inp = { ...input.state(), slow: mode === 'combat' && charge !== null };   // 모으는 동안은 반 속도
+    // 밀기: 서 있는 채로 바라보는 쪽을 누르고 있으면 앞 칸의 돌을 민다(밀린 칸으로는 이어서 걸어 들어간다)
+    if (mode === 'explore' && puzzleOn() && pressing(hero, inp.dir)) {
+      const d = DIRS[inp.dir];
+      onPuzzle(push(puzzle, Math.round(hero.x) + d.dx, Math.round(hero.z) + d.dz, d.dx, d.dz, baseBlocked));
+    }
+    step(hero, inp, dt, blocked);
+    // 순서 돌: 새 칸에 들어설 때마다 한 번 밟은 것으로 친다(멈추지 않고 지나가도)
+    const c = standing(hero), cell = `${c.x},${c.z}`;
+    if (cell !== lastCell) {
+      lastCell = cell;
+      if (mode === 'explore' && puzzleOn()) onPuzzle(stepOn(puzzle, c.x, c.z));
+    }
   }
+  if (puzzle && mode === 'explore') tickPuzzle(puzzle, dt);
   if (mode === 'explore') checkTriggers();
   if (mode === 'combat') stepFight(dt);
   if (hero && !transitioning) render(dt);

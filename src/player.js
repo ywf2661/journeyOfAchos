@@ -14,6 +14,11 @@ export function createWalker(x, z, dir = 'up') {
   return { x, z, dir, facing: DIRS[dir].facing, from: null, to: null, t: 0, speed: 0, wait: 0, moving: false };
 }
 
+// 마지막으로 온전히 선 칸. 걷는 중이면 막 떠나온 칸이라, 멈추지 않고 지나간 칸도 그 프레임에 한 번은 나온다(순서 돌 밟기).
+export const standing = w => (w.to ? w.from : { x: w.x, z: w.z });
+// 선 채로 dir 쪽을 보고 누르고 있나. 돌아서는 중이면 아니다(짧게 누르면 방향만 바뀌니, 앞의 돌도 밀지 않는다).
+export const pressing = (w, dir) => !!dir && dir === w.dir && !w.to && w.wait <= 1e-9;
+
 function face(w, dir) {
   w.dir = dir;
   w.facing = DIRS[dir].facing;

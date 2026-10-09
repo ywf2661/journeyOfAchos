@@ -93,6 +93,59 @@ export function createRenderer(canvas, sheets) {
       }
     }
     for (const b of s.blockers) tile(b.art, px(b.x), py(b.z));
+    // 퍼즐 장치: 구덩이·발판·순서 돌·물살·낙엽·시계 돌·다시 놓기 돌·미는 돌(돌이 맨 위)
+    const pz = s.puzzle;
+    if (pz) {
+      for (const pt of pz.pits) {
+        const x = px(pt.x), y = py(pt.z);
+        if (pt.filled) tile(['farm', 77], x, y);
+        else {
+          ctx.fillStyle = '#1b130f';
+          ctx.fillRect(x + 1, y + 1, T - 2, T - 2);
+          ctx.fillStyle = '#3b2a1f';
+          ctx.fillRect(x + 1, y + 1, T - 2, 2);
+        }
+      }
+      for (const pl of pz.plates) tile(['dungeon', pl.on ? 44 : 43], px(pl.x), py(pl.z));
+      for (const st of pz.steps) {
+        tile(['town', 43], px(st.x), py(st.z));
+        if (st.lit) {
+          ctx.fillStyle = 'rgba(255, 220, 120, 0.55)';
+          ctx.fillRect(px(st.x) + 2, py(st.z) + 2, T - 4, T - 4);
+        }
+      }
+      if (pz.flowing) {   // 시간이 흐르는 동안 개울 칸에 물살 줄이 지나간다
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        for (const c of pz.stream) ctx.fillRect(px(c.x) + Math.floor((s.t * 24) % T), py(c.z) + 7, 4, 1);
+      }
+      for (const r of pz.rafts) {   // 큰 낙엽: 주황 잎과 잎맥
+        const cx = px(r.x) + T / 2, cy = py(r.z) + T / 2;
+        ctx.fillStyle = '#d9782f';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 7, 5, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#8a4517';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - 5, cy + 2);
+        ctx.lineTo(cx + 5, cy - 2);
+        ctx.stroke();
+      }
+      if (pz.clock) {   // 시계 돌: 새긴 돌판 위에 시계 얼굴
+        const x = px(pz.clock.x), y = py(pz.clock.z);
+        tile(['dungeon', 65], x, y);
+        ctx.strokeStyle = pz.flowing ? '#ffd76a' : '#e8e0d0';
+        ctx.beginPath();
+        ctx.arc(x + 8, y + 7, 3, 0, Math.PI * 2);
+        ctx.moveTo(x + 8, y + 7);
+        ctx.lineTo(x + 8, y + 5);
+        ctx.moveTo(x + 8, y + 7);
+        ctx.lineTo(x + 10, y + 7);
+        ctx.stroke();
+      }
+      if (pz.reset) tile(['dungeon', 56], px(pz.reset.x), py(pz.reset.z));
+      for (const b of pz.boulders) tile(['dungeon', 55], px(b.x), py(b.z));
+    }
     // 모닥불: 깜빡이는 불씨 몇 개와 장작
     for (const f of map.lights) {
       if (!f.fire) continue;

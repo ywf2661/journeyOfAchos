@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWalker, step, dash, front, WALK, RUN, TURN } from '../src/player.js';
+import { createWalker, step, dash, front, standing, pressing, WALK, RUN, TURN } from '../src/player.js';
 
 const open = () => false;
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≈ ${b}`);
@@ -79,4 +79,27 @@ test('성휘참을 모으는 동안(slow)은 걷는 속도가 절반이다', () 
   const w = createWalker(0, 0, 'up');
   step(w, { dir: 'up', slow: true }, 1 / WALK, open);
   near(w.z, -0.5);
+});
+
+test('standing은 마지막으로 온전히 선 칸이라, 멈추지 않고 지나간 칸도 프레임마다 보면 빠짐없이 나온다', () => {
+  // 프레임(0.07초)이 칸 길이(0.25초)와 안 맞아서, 칸에 닿은 프레임에도 이미 다음 칸으로 걸어 나가 있다
+  const w = createWalker(0, 0, 'right'), seen = [];
+  for (let i = 0; i < 12; i++) {
+    step(w, { dir: 'right' }, 0.07, open);
+    const c = standing(w), k = `${c.x},${c.z}`;
+    if (seen.at(-1) !== k) seen.push(k);
+  }
+  assert.deepEqual(seen, ['0,0', '1,0', '2,0', '3,0']);
+});
+
+test('pressing은 선 채로 그 방향을 보고, 돌아서기까지 끝났을 때만 참이다(짧게 눌러 돌아서면 돌을 밀지 않게)', () => {
+  const w = createWalker(0, 0, 'up'), wall = () => true;
+  assert.ok(pressing(w, 'up'));
+  assert.ok(!pressing(w, 'left') && !pressing(w, null));
+  step(w, { dir: 'left' }, TURN / 2, wall);
+  assert.ok(!pressing(w, 'left'), '아직 돌아서는 중');
+  step(w, { dir: 'left' }, TURN, wall);
+  assert.ok(pressing(w, 'left'), '다 돌아섰고 앞이 막혀 서 있다');
+  step(w, { dir: 'left' }, 0.1, open);
+  assert.ok(!pressing(w, 'left'), '걷는 중');
 });
