@@ -28,7 +28,7 @@
 
 휴대폰·태블릿: 왼쪽 아래 조이스틱으로 걷고, 오른쪽 아래 Z·X 버튼은 위 표와 같습니다.
 
-진행은 자동 저장됩니다(지역에 들어갈 때, 대화가 끝날 때).
+진행은 자동 저장됩니다(지역에 들어갈 때, 대화가 끝날 때, 퍼즐을 풀 때).
 
 ## 개발
 
@@ -36,9 +36,9 @@
     npm run shot -- <출력.png> 1280x720 [저장.json]   # 헤드리스 Chrome 스크린샷(서버를 먼저 띄운다)
 
 - 대사: `data/script.js` · 지역 맵과 전투: `data/regions.js` · 맵 기호와 타일: `data/tiles.js` · 인물 그림: `data/sprites.js`
-- 아코스·아이온 도트는 힉스필드 참고 시트를 `tools/pixelize.py`(파이썬 + Pillow)로 줄여 만든다. 만든 명령은 그 파일 맨 위에 있다.
-- 게임 규칙(대화·저장·전투·칸 이동·맵)은 `src/story.js`, `src/combat.js`, `src/player.js`, `src/map.js`, `src/region.js`에 있고 테스트가 있습니다.
-- 설계: `docs/superpowers/specs/2026-10-08-2d-topdown-design.md`
+- 아코스·아이온 도트는 힉스필드 참고 시트(`tools/sprite-refs/`)를 `tools/pixelize.py`(파이썬 + Pillow)로 줄여 만든다. 만든 명령은 그 파일 맨 위에 있다.
+- 게임 규칙(대화·저장·전투·칸 이동·맵·퍼즐·큰 인물 프레임)은 `src/story.js`, `src/combat.js`, `src/player.js`, `src/map.js`, `src/region.js`, `src/puzzle.js`, `src/anim.js`에 있고 테스트가 있습니다.
+- 설계: `docs/superpowers/specs/2026-10-08-2d-topdown-design.md`, 퍼즐 `docs/superpowers/specs/2026-10-09-puzzles-design.md`
 
 ## 배포
 

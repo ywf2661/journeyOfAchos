@@ -10,11 +10,11 @@
    - 칸 40×32에 발 기준점을 (20, 31)로 맞춰 가로로 잇고(data/sprites.js의 foot), 떨어진 점을 지우고
      한 칸 구멍을 메운 뒤, Kenney 인물과 같은 색의 1px 외곽선을 두른다.
 
-지금 그림(2026-10-09)을 만든 명령 — 참고 시트는 힉스필드 나노 바나나 프로로 뽑았다:
-  frames achos_ref.png red 20 f/ref       (서 있기 앞·옆·뒤 + 옆 베기)
-  frames achos_walk_ref.png red 20 f/walk (걷기 3줄×3칸)
-  frames achos_slash_ref.png red 20 f/slash (앞 들어 올리기·내려베기, 뒤 들어 올리기·베기)
-  frames aion_ref.png silver 20 f/aion
+지금 그림(2026-10-09)을 만든 명령(저장소 루트에서, f/는 중간 산출물이라 끝나면 지운다) — 참고 시트(tools/sprite-refs/)는 힉스필드 나노 바나나 프로로 뽑았다:
+  frames tools/sprite-refs/achos_ref.png red 20 f/ref       (서 있기 앞·옆·뒤 + 옆 베기)
+  frames tools/sprite-refs/achos_walk_ref.png red 20 f/walk (걷기 3줄×3칸)
+  frames tools/sprite-refs/achos_slash_ref.png red 20 f/slash (앞 들어 올리기·내려베기, 뒤 들어 올리기·베기)
+  frames tools/sprite-refs/aion_ref.png silver 20 f/aion
   pack assets/sprites/achos.png f/ref:0 f/ref:1 f/ref:2 f/walk:0 f/walk:1 f/walk:2 f/walk:3 f/walk:4 f/walk:5
        f/walk:6 f/walk:7 f/walk:8 f/slash:0 f/slash:1 f/ref:1 f/ref:3 f/slash:2 f/slash:3
   pack assets/sprites/aion.png f/aion:0 f/aion:1 f/aion:2 f/aion:3
@@ -155,6 +155,11 @@ def pack(out_path, refs):
         for x in range(w):
             if c[x, y][3] == 0 and any(0 <= nx < w and 0 <= ny < h and nx // CW == x // CW and c[nx, ny][3] > 0
                                        for nx, ny in near(x, y)):
+                f[x, y] = OUTLINE
+    # 칸 가장자리(왼·오른쪽·위)에 닿은 점은 바깥에 외곽선을 둘 수 없으니 그 점을 외곽선 색으로(칼끝이 잘려 보이지 않게)
+    for y in range(h):
+        for x in range(w):
+            if f[x, y][3] > 0 and (x % CW in (0, CW - 1) or y == 0):
                 f[x, y] = OUTLINE
     final.save(out_path)
     print(out_path, final.size)
