@@ -104,6 +104,7 @@ function isValidSave(s) {
   return s?.v === 1 && [1, 2, 3, 4, 5].includes(s.region) && [1, 2, 3].includes(s.day)
     && isStrings(s.flags) && isStrings(s.memories)
     && (s.pendingFight === null || typeof s.pendingFight === 'string')
+    && (s.hp === undefined || (Number.isInteger(s.hp) && s.hp >= 1))   // 체력: 없으면(예전 저장) 가득으로 본다
     && s.ended === false;
 }
 

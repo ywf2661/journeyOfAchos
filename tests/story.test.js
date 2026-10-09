@@ -175,3 +175,15 @@ test('clearSave 뒤에는 불러올 것이 없다', () => {
   clearSave(st);
   assert.equal(loadGame(st), null);
 });
+
+test('체력(hp)이 있는 저장도, 없는 예전 저장도 불러오고, 잘못된 체력은 깨진 저장', () => {
+  const st = memStorage();
+  const s = { ...createState(), hp: 3 };
+  saveGame(st, s);
+  assert.deepEqual(loadGame(st), s);
+  for (const hp of [0, -1, 2.5, '3']) {
+    st.setItem(SAVE_KEY, JSON.stringify({ ...createState(), hp }));
+    assert.equal(loadGame(st), null, String(hp));
+  }
+});
+

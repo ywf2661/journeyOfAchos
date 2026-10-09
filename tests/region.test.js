@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../src/story.js';
-import { matches, lightFor, actorsFor, triggersFor, blockedFor } from '../src/region.js';
+import { matches, lightFor, actorsFor, triggersFor, blockedFor, fieldFightsFor, herbsFor } from '../src/region.js';
 import { parseMap } from '../src/map.js';
 
 const REGION = {
@@ -54,4 +54,24 @@ test('blockedFor: 맵의 막힌 칸, 지금 보이는 인물, 조건이 맞아 �
   assert.equal(blocked(9, 9), true);    // 맵 밖
   s.flags.push('gate_open');
   assert.equal(blockedFor(region, map, s)(0, 1), false);
+});
+
+test('fieldFightsFor: 그 지역의 필드 전투 중 조건이 맞고 아직 안 이긴 것', () => {
+  const fights = {
+    a: { region: 1, field: { x: 0, z: 0, r: 2 } },
+    b: { region: 1, field: { x: 0, z: 0, r: 2 }, if: 'ready', day: 2 },
+    c: { region: 2, field: { x: 0, z: 0, r: 2 } },
+    d: { region: 1, enemies: [] },
+  };
+  const s = createState();
+  assert.deepEqual(fieldFightsFor(fights, 1, s).map(([id]) => id), ['a']);
+  s.flags.push('ready', 'won:a'); s.day = 2;
+  assert.deepEqual(fieldFightsFor(fights, 1, s).map(([id]) => id), ['b']);
+});
+
+test('herbsFor: 아직 먹지 않은 약초', () => {
+  const r = { herbs: [{ id: 'h1', x: 0, z: 0 }, { id: 'h2', x: 1, z: 0 }] }, s = createState();
+  s.flags.push('done:h1');
+  assert.deepEqual(herbsFor(r, s).map(h => h.id), ['h2']);
+  assert.deepEqual(herbsFor({}, s), []);
 });
