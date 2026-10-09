@@ -93,6 +93,7 @@ export function createRenderer(canvas, sheets) {
       }
     }
     for (const b of s.blockers) tile(b.art, px(b.x), py(b.z));
+    for (const h of s.herbs ?? []) tile(['farm', 80], px(h.x), py(h.z));   // 약초
     // 퍼즐 장치: 구덩이·발판·순서 돌·물살·낙엽·시계 돌·다시 놓기 돌·미는 돌(돌이 맨 위)
     const pz = s.puzzle;
     if (pz) {
@@ -175,6 +176,16 @@ export function createRenderer(canvas, sheets) {
         ctx.drawImage(img, sx, sy, w, h, -fx, -fy, w, h);
       }
       ctx.restore();
+    }
+    // 투척꾼의 오물: 올리브색 덩어리에 어두운 테
+    ctx.fillStyle = '#6b8f2a';
+    ctx.strokeStyle = '#1a2410';
+    ctx.lineWidth = 1;
+    for (const o of s.shots ?? []) {
+      ctx.beginPath();
+      ctx.arc(px(o.x) + T / 2, py(o.z) + T / 2, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
     // 위로 휘두를 때: 뒷모습 그림만으로는 칼이 오른쪽으로 가는 듯 보여서, 머리 위에 흰 반달을 덧그린다
     if (s.swing) {

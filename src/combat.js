@@ -143,7 +143,8 @@ function charger(f, e, i, dt, player, blocked, events) {
     return;
   }
   const dx = player.x - e.x, dz = player.z - e.z, ax = Math.abs(dx), az = Math.abs(dz);
-  const inRow = az < 0.5 && ax <= CHARGE_RANGE, inCol = ax < 0.5 && az <= CHARGE_RANGE;
+  // 같은 줄이고 1칸 넘게 떨어져 있어야 돌진한다(붙어 있으면 방향이 없다)
+  const inRow = az < 0.5 && ax >= 1 && ax <= CHARGE_RANGE, inCol = ax < 0.5 && az >= 1 && az <= CHARGE_RANGE;
   if ((inRow || inCol) && e.cd <= 0) {
     e.windup = CHARGE_WINDUP;
     e.aim = inRow ? { dx: Math.sign(dx), dz: 0 } : { dx: 0, dz: Math.sign(dz) };

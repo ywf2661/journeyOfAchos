@@ -4,7 +4,7 @@ import { REGIONS, FIGHTS } from '../data/regions.js';
 import { TILES, STAMPS } from '../data/tiles.js';
 import { SPRITES } from '../data/sprites.js';
 import { createState, createDialogue, applyEffect, winFight, markDone, speakerName, saveGame, loadGame, clearSave, has } from './story.js';
-import { triggersFor, actorsFor, blockedFor, lightFor, matches } from './region.js';
+import { triggersFor, actorsFor, blockedFor, lightFor, matches, fieldFightsFor, herbsFor } from './region.js';
 import { parseMap, isSolid } from './map.js';
 import { dist } from './geom.js';
 import { createWalker, step, dash, front, standing, pressing, OPPOSITE, DIRS } from './player.js';
@@ -23,6 +23,8 @@ document.body.classList.toggle('touch', TOUCH);
 const storage = (() => { try { return localStorage; } catch { return null; } })();
 const MAPS = Object.fromEntries(Object.entries(REGIONS).map(([k, r]) => [k, parseMap(r.map, r.bounds, TILES, STAMPS)]));
 const input = createInput({ onPress, onRelease, onCancel: () => { charge = null; } });   // 놓치면 성휘참 모으기도 그친다
+// 적 종류별 그림: 걸음꾼은 지금의 역병 인물, 투척꾼·돌진꾼은 data/sprites.js의 같은 이름
+const enemyLook = (kind = 'walker') => SPRITES[kind === 'walker' ? 'plague' : kind];
 const WAVE_TIME = 0.3;   // 성휘참 빛 칼날이 4칸을 날아가는 시간(초)
 
 let renderer, state, hero, blocked, baseBlocked;
@@ -31,6 +33,7 @@ let mode = 'title';   // title | loading | explore | dialogue | combat | end | e
 let dialogue = null, view = null, ending = false;
 let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   // heroSlash: 베기 동작이 끝날 때까지 남은 시간
 let charge = null, waves = [], flash = 0;   // charge: 전투 중 Z를 누르고 있는 시간(안 누르면 null)
+let fieldStart = null;   // 필드 전투가 시작된 칸과 방향(지면 여기서 다시 시작한다)
 // 지역·날짜를 바꾸는 동안 그리기를 멈춘다. 상태는 이미 다음 날로 바뀌었지만, 화면이 다 어두워질 때까지 지난 장면을 그대로 둔다.
 let transitioning = false;
 
@@ -65,7 +68,11 @@ async function enterRegion() {
   const def = region().puzzle;
   puzzle = def ? createPuzzle(def, has(state, `solved:${def.id}`)) : null;
   lastCell = `${s.x},${s.z}`;
+  state.hp = PLAYER_MAX_HP;   // 지역에 들어오면(다음 날 포함) 체력 가득
+  // 필드 전투 도중에 나갔으면 취소한다: 무리는 맵에 그대로 서 있고, 다시 다가가면 시작한다
+  if (state.pendingFight && FIGHTS[state.pendingFight].field) state.pendingFight = null;
   refreshBlocked();
+  showLife();
   transitioning = false;
   saveGame(storage, state);
   await ui.fade(false);
@@ -84,7 +91,27 @@ function facingTrigger() {
   return best;
 }
 
+// 탐험 중 하트: 다쳤을 때만 보인다
+function showLife() {
+  if (state.hp < PLAYER_MAX_HP) ui.showHud(state.hp, PLAYER_MAX_HP, null);
+  else ui.hideHud();
+}
+
+// 약초: 다친 채로 그 칸에 들어서면 ♥+1(약초마다 한 번). 체력이 가득하면 밟아도 그대로 남는다.
+function eatHerb(c) {
+  const h = herbsFor(region(), state).find(h => h.x === c.x && h.z === c.z);
+  if (!h || state.hp >= PLAYER_MAX_HP) return;
+  state.hp += 1;
+  markDone(state, h);
+  ui.toast('약초를 씹었다. 기운이 조금 돈다.');
+  saveGame(storage, state);
+  showLife();
+}
+
 function checkTriggers() {
+  // 필드 전투: 맵에 서 있는 무리의 원 안에 들어오면 그 자리에서 시작한다
+  const field = fieldFightsFor(FIGHTS, state.region, state).find(([, d]) => dist(hero, d.field) <= d.field.r);
+  if (field) return startField(field[0]);
   const auto = triggersFor(region(), state).find(t => t.auto && dist(hero, t) <= t.r);
   if (auto) return openDialogue(auto.node, auto);
   const f = front(hero), dev = puzzleOn() && deviceAt(puzzle, f.x, f.z);
@@ -132,16 +159,27 @@ async function closeDialogue() {
   if (cmds.some(c => c.type === 'ending')) return startEnding();
   saveGame(storage, state);
   refreshBlocked();
+  showLife();
   for (const c of cmds) {
     if (c.type === 'reload') await enterRegion();
     if (c.type === 'combat') startFight(c.id);
   }
 }
 
-function startFight(id) {
+function startField(id) {
+  state.pendingFight = id;
+  fieldStart = { ...standing(hero), dir: hero.dir };
+  ui.showPrompt(null);
+  ui.toast('무리가 달려든다!');
+  startFight(id);
+}
+
+// full: 진 뒤 다시 시작(체력 가득). 아니면 이어지는 체력으로 시작한다.
+function startFight(id, full = false) {
   const def = FIGHTS[id];
-  fight = createFight(def);
+  fight = createFight(def, full ? PLAYER_MAX_HP : state.hp);
   if (def.player) hero = createWalker(...def.player);
+  else if (full && fieldStart) hero = createWalker(fieldStart.x, fieldStart.z, fieldStart.dir);   // 필드 전투: 시작한 칸으로
   looks = fight.enemies.map(() => ({ red: 0, white: 0, gone: 0 }));
   ui.setFrozenLook(!!def.frozen);
   tickAcc = 0;
@@ -149,9 +187,9 @@ function startFight(id) {
 }
 
 function stepFight(dt) {
-  for (const ev of updateFight(fight, dt, hero)) {
+  for (const ev of updateFight(fight, dt, hero, blocked)) {
     const [kind, i] = ev.split(':');
-    if (kind === 'windup') looks[i].red = 0.5;
+    if (kind === 'windup') looks[i].red = fight.enemies[i].windup;   // 준비하는 동안 붉게
     if (kind === 'hurt') hurt = 0.4;
     if (kind === 'lost') return loseFight();
   }
@@ -200,6 +238,7 @@ function clearFight() {
 // 이기거나 지면 잠깐 그대로 보여 준 뒤(쓰러진 적이 깜빡이며 사라진다) 정리한다
 function winCurrentFight() {
   mode = 'loading';
+  state.hp = fight.hp;   // 남은 체력이 다음 전투로 이어진다
   setTimeout(() => {
     clearFight();
     openDialogue(winFight(state, FIGHTS));
@@ -212,7 +251,7 @@ function loseFight() {
   ui.toast(fight.def.frozen ? '멈춘 시간이 다시 흐른다… 처음부터.' : '쓰러졌다… 다시 일어선다.');
   setTimeout(() => {
     clearFight();
-    startFight(id);
+    startFight(id, true);
   }, 1800);
 }
 
@@ -306,8 +345,16 @@ function render(dt) {
     x: hero.x, z: hero.z, alpha: fight?.invuln > 0 ? 0.5 : 1,
     tint: hurt > 0 ? '#c0392b' : ready && Math.floor(time * 12) % 2 ? '#ffd76a' : undefined,
   });
+  // 필드 전투의 무리: 싸우기 전에는 제자리에 서 있다
+  for (const [id, d] of fieldFightsFor(FIGHTS, state.region, state)) {
+    if (fight && state.pendingFight === id) continue;
+    for (const [x, z, kind] of d.enemies) {
+      const p = enemyLook(kind);
+      things.push({ art: p.art, tint: p.tint, x, z, flip: x > hero.x });
+    }
+  }
   fight?.enemies.forEach((e, i) => {
-    const l = looks[i], p = SPRITES.plague;
+    const l = looks[i], p = enemyLook(e.kind);
     l.red = Math.max(0, l.red - dt);
     l.white = Math.max(0, l.white - dt);
     if (e.hp <= 0) l.gone += dt;
@@ -315,12 +362,14 @@ function render(dt) {
     things.push({
       art: p.art, x: e.x, z: e.z, flip: e.x > hero.x,
       tint: l.white > 0 ? '#ffffff' : l.red > 0 ? '#c0392b' : p.tint,
-      alpha: e.hp <= 0 && Math.floor(l.gone * 10) % 2 ? 0.2 : 1,
+      alpha: e.hp <= 0 && Math.floor(l.gone * 10) % 2 ? 0.2 : e.stun > 0 ? 0.5 : 1,   // 기절한 돌진꾼은 반투명
     });
   });
   renderer.draw({
     map: map(), cam: hero, things, t: time, flash,
     puzzle: puzzle && pieces(puzzle),
+    shots: fight?.shots ?? [],
+    herbs: herbsFor(region(), state),
     waves: waves.map(w => ({ x: w.x, z: w.z, facing: w.facing, p: w.t / WAVE_TIME })),
     swing: hero.dir === 'up' && heroSlash > 0 && heroSlash <= SLASH_TIME / 2 ? { x: hero.x, z: hero.z } : null,
     blockers: (region().blockers ?? []).filter(b => b.art && matches(b, state)),
@@ -352,6 +401,7 @@ function frame(now) {
     if (cell !== lastCell) {
       lastCell = cell;
       if (mode === 'explore' && puzzleOn()) onPuzzle(stepOn(puzzle, c.x, c.z));
+      if (mode === 'explore') eatHerb(c);
     }
   }
   if (puzzle && mode === 'explore') tickPuzzle(puzzle, dt);

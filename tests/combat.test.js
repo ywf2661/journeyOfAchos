@@ -186,3 +186,9 @@ test('돌진꾼: 줄이 안 맞으면 줄을 맞추러 움직인다(차이가 �
   update(f, 0.1, P);
   assert.ok(f.enemies[0].z < 1.5 && f.enemies[0].x === 3);
 });
+
+test('돌진꾼: 아코스와 1칸 안으로 붙어 있으면 돌진하지 않는다(제자리 돌진으로 맞히지 않게)', () => {
+  const f = createFight({ enemies: [[0, 0.3, 'charger']] });
+  assert.deepEqual(update(f, 0.01, P), []);
+  assert.equal(f.enemies[0].windup, 0);
+});
