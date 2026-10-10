@@ -65,3 +65,17 @@ test('키 큰 것(나무·건물·울타리) 바로 아래 지나갈 수 있는 
   assert.equal(at(m, 0, 1).shade, true);
   assert.ok(!at(m, 1, 1).shade && !at(m, 1, 0).shade && !at(m, 0, 0).shade);
 });
+
+test('물은 풀밭 쪽에 물가 조각을 쓰고, 폭포와 붙은 쪽은 물이 이어진다', () => {
+  const bat = i => ['battle', i];
+  const m = parseMap([
+    '.....',
+    '.~~~.',
+    '.~~~.',
+    '.~W~.',
+  ], O, TILES, STAMPS);
+  assert.deepEqual([1, 2, 3].map(x => at(m, x, 1).ground), [bat(18), bat(19), bat(20)]);
+  assert.deepEqual(at(m, 2, 2).ground, bat(37));
+  assert.deepEqual(at(m, 1, 3).ground, bat(36), '아래는 맵 끝(물이 이어진다), 오른쪽은 폭포');
+  assert.ok(at(m, 1, 1).solid);
+});

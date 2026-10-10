@@ -11,6 +11,7 @@ export const SHEETS = {
 const town = i => ['town', i], dun = i => ['dungeon', i], bat = i => ['battle', i], farm = i => ['farm', i];
 // 3×3 조각(왼위·위·오위 / 왼·가운데·오른 / 왼아래·아래·오아래): 각 줄 첫 칸 번호에서 셋씩
 const nine = (sheet, rows) => rows.flatMap(i => [i, i + 1, i + 2].map(sheet));
+const wet = cell => cell.ground[0] === 'battle' && (cell.ground[1] === 37 || cell.ground[1] === 75);   // 물·폭포 바닥
 const grassy = cell => cell.ground[0] === 'town' && cell.ground[1] <= 2;   // 잔디·풀 포기·꽃 바닥(나무 밑도 잔디)
 
 // ground: 바닥, top: 그 위에 얹는 그림, solid: 못 지나감, light: 밤에 둘레를 밝힘, fire: 깜빡이는 불(draw.js가 그린다)
@@ -24,7 +25,7 @@ export const TILES = {
   _: { ground: town(109) },                                       // 돌바닥(광장)
   x: { ground: dun(12) },                                         // 역병에 썩은 땅
   '+': { ground: dun(37) },                                       // 나무 다리
-  '~': { ground: bat(37), solid: true },                          // 물
+  '~': { ground: bat(37), solid: true, auto: { on: 'ground', nine: nine(bat, [18, 36, 54]), edge: c => !wet(c) } },   // 물: 풀밭 쪽 물가
   W: { ground: bat(75), solid: true },                            // 멈춘 폭포
   // 나무: 모이면 숲 덩어리 조각, 한 줄로만 서 있으면 한 그루 그림
   T: { ground: town(0), top: town(28), solid: true, auto: { on: 'top', nine: nine(town, [6, 18, 30]), lone: town(28), outside: true, edge: (c, s) => s !== 'T' } },
