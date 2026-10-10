@@ -9,20 +9,26 @@ export const SHEETS = {
   aion: { url: 'assets/sprites/aion.png', cols: 4, rows: 1, cell: [40, 32] },
 };
 const town = i => ['town', i], dun = i => ['dungeon', i], bat = i => ['battle', i], farm = i => ['farm', i];
+// 3×3 조각(왼위·위·오위 / 왼·가운데·오른 / 왼아래·아래·오아래): 각 줄 첫 칸 번호에서 셋씩
+const nine = (sheet, rows) => rows.flatMap(i => [i, i + 1, i + 2].map(sheet));
+const grassy = cell => cell.ground[0] === 'town' && cell.ground[1] <= 2;   // 잔디·풀 포기·꽃 바닥(나무 밑도 잔디)
 
 // ground: 바닥, top: 그 위에 얹는 그림, solid: 못 지나감, light: 밤에 둘레를 밝힘, fire: 깜빡이는 불(draw.js가 그린다)
+// auto: 이웃을 보고 3×3 조각을 고른다(src/map.js) — on: 바꿀 그림(ground|top), edge(이웃 칸, 이웃 기호): 그쪽이 가장자리인가,
+//   inner: 안쪽 모서리(왼위·오위·왼아래·오아래), lone: 한 줄짜리일 때, outside: 맵 밖도 가장자리로 본다(없으면 같은 것이 이어진다고 본다). vary: [[그림, 비율]…] 칸마다 정해진 무늬를 섞는다.
 export const TILES = {
-  '.': { ground: town(0) },                                       // 잔디
+  '.': { ground: town(0), vary: [[town(1), 0.1], [town(2), 0.03]] },   // 잔디(풀 포기·꽃이 드문드문)
   ',': { ground: town(1) },                                       // 풀 포기
   '*': { ground: town(2) },                                       // 꽃
-  '=': { ground: town(25) },                                      // 흙길
+  '=': { ground: town(25), auto: { on: 'ground', nine: nine(town, [12, 24, 36]), inner: [39, 40, 41, 42].map(town), edge: grassy } },   // 흙길: 풀밭 쪽 가장자리
   _: { ground: town(109) },                                       // 돌바닥(광장)
   x: { ground: dun(12) },                                         // 역병에 썩은 땅
   '+': { ground: dun(37) },                                       // 나무 다리
   '~': { ground: bat(37), solid: true },                          // 물
   W: { ground: bat(75), solid: true },                            // 멈춘 폭포
-  T: { ground: town(0), top: town(28), solid: true },             // 초록 나무(한 칸짜리 완성 그림)
-  Y: { ground: town(0), top: town(27), solid: true },             // 단풍 나무(한 칸짜리 완성 그림)
+  // 나무: 모이면 숲 덩어리 조각, 한 줄로만 서 있으면 한 그루 그림
+  T: { ground: town(0), top: town(28), solid: true, auto: { on: 'top', nine: nine(town, [6, 18, 30]), lone: town(28), outside: true, edge: (c, s) => s !== 'T' } },
+  Y: { ground: town(0), top: town(27), solid: true, auto: { on: 'top', nine: nine(town, [9, 21, 33]), lone: town(27), outside: true, edge: (c, s) => s !== 'Y' } },
   D: { ground: town(0), top: farm(2), solid: true },              // 앙상한 나무
   M: { ground: town(0), top: bat(5), solid: true },               // 산
   o: { ground: town(0), top: farm(89), solid: true },             // 바위

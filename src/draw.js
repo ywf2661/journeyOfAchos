@@ -89,6 +89,7 @@ export function createRenderer(canvas, sheets) {
       for (let c = c0; c <= c1; c++) {
         const cell = map.cells[r * map.w + c];
         tile(cell.ground, c * T - left, r * T - top);
+        if (cell.shade) { ctx.fillStyle = 'rgba(20, 40, 20, 0.22)'; ctx.fillRect(c * T - left, r * T - top, T, 3); }   // 키 큰 것 아래 그림자
         if (cell.top) tile(cell.top, c * T - left, r * T - top);
       }
     }
