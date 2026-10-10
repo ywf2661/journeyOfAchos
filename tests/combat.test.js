@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFight, update, swing, dodge, holySlash, PLAYER_MAX_HP, ENEMY_HP, ENEMY_REACH, ENEMY_SPEED, SWING_COOLDOWN, HOLY_GAUGE,
-  THROWER_HP, CHARGER_HP, THROW_EVERY, CHARGE_WINDUP, STUN_TIME } from '../src/combat.js';
+  THROWER_HP, CHARGER_HP, THROW_EVERY, CHARGE_WINDUP, STUN_TIME, THROWER_FAR } from '../src/combat.js';
+import { dist } from '../src/geom.js';
 
 const P = { x: 0, z: 0, facing: 0 };   // +z를 바라본다
 
@@ -191,4 +192,35 @@ test('돌진꾼: 아코스와 1칸 안으로 붙어 있으면 돌진하지 않�
   const f = createFight({ enemies: [[0, 0.3, 'charger']] });
   assert.deepEqual(update(f, 0.01, P), []);
   assert.equal(f.enemies[0].windup, 0);
+});
+
+// ───────── 지형: 적은 막힌 칸에 들어가지 않고 돌아서 온다 ─────────
+// dt마다 움직이며 한 번이라도 막힌 칸에 들어갔는지 본다
+function walkThrough(enemy, blocked, seconds, player = P) {
+  const f = createFight({ enemies: [enemy] });
+  let inside = false;
+  for (let t = 0; t < seconds; t += 0.05) {
+    update(f, 0.05, player, blocked);
+    const e = f.enemies[0];
+    if (blocked(Math.round(e.x), Math.round(e.z))) inside = true;
+  }
+  return { e: f.enemies[0], inside };
+}
+const wallAt = z => (x, z2) => z2 === z && Math.abs(x) <= 2;   // 아코스와 적 사이를 가로막는 5칸짜리 벽
+
+test('걸음꾼은 벽을 지나가지 않고 돌아서 다가온다', () => {
+  const { e, inside } = walkThrough([0, 5], wallAt(2), 10);
+  assert.equal(inside, false, '벽 칸에 들어갔다');
+  assert.ok(dist(e, P) <= ENEMY_REACH + 0.05, `다가오지 못했다 (${e.x.toFixed(2)}, ${e.z.toFixed(2)})`);
+});
+
+test('투척꾼은 다가올 때 벽을 지나가지 않는다', () => {
+  const { e, inside } = walkThrough([0, 12, 'thrower'], wallAt(8), 10);
+  assert.equal(inside, false);
+  assert.ok(dist(e, P) <= THROWER_FAR + 0.1, '돌아서 거리 안으로 들어온다');
+});
+
+test('돌진꾼은 줄을 맞추러 움직일 때도 벽을 지나가지 않는다', () => {
+  const { inside } = walkThrough([4, 3, 'charger'], (x, z) => x === 4 && (z === 1 || z === 2), 6);
+  assert.equal(inside, false);
 });

@@ -52,7 +52,7 @@ export function createFight(def, hp = PLAYER_MAX_HP) {
 }
 
 // ponytail: 적끼리는 겹쳐도 밀어내지 않는다. 한 번에 3마리라 티가 덜 난다. 거슬리면 resolve로 서로 밀어낸다.
-// blocked(x, z): 막힌 칸(투척꾼 물러나기, 오물, 돌진이 쓴다). 걸음꾼은 지금처럼 벽을 지나간다.
+// blocked(x, z): 막힌 칸. 적은 막힌 칸에 들어가지 않고, 곧게 못 오면 칸 길(아코스까지의 걸음 수)을 따라 돌아온다.
 export function update(f, dt, player, blocked = () => false) {
   const events = [];
   if (f.result) return events;
@@ -64,11 +64,13 @@ export function update(f, dt, player, blocked = () => false) {
     return events;
   }
   moveShots(f, dt, player, blocked, events);   // 이번 프레임에 던진 오물은 다음 프레임부터 난다
+  let steps = null;   // 아코스까지의 칸 걸음 수(필요할 때 한 번만 센다)
+  const way = { blocked, steps: () => (steps ??= stepsTo(player, blocked)) };
   f.enemies.forEach((e, i) => {
     if (e.hp <= 0) return;
     e.cd = Math.max(0, e.cd - dt);
-    if (e.kind === 'thrower') return thrower(f, e, dt, player, blocked);
-    if (e.kind === 'charger') return charger(f, e, i, dt, player, blocked, events);
+    if (e.kind === 'thrower') return thrower(f, e, dt, player, way);
+    if (e.kind === 'charger') return charger(f, e, i, dt, player, way, events);
     const d = dist(e, player);
     if (e.windup > 0) {
       e.windup -= dt;
@@ -77,9 +79,7 @@ export function update(f, dt, player, blocked = () => false) {
         if (d <= ENEMY_REACH + 0.4 && f.invuln <= 0) { f.hp -= 1; events.push('hurt'); }
       }
     } else if (d > ENEMY_REACH) {
-      const step = Math.min(ENEMY_SPEED * dt, d - ENEMY_REACH);
-      e.x += ((player.x - e.x) / d) * step;
-      e.z += ((player.z - e.z) / d) * step;
+      chase(e, player, Math.min(ENEMY_SPEED * dt, d - ENEMY_REACH), way);
     } else if (e.cd <= 0) {
       e.windup = ENEMY_WINDUP;
       events.push(`windup:${i}`);
@@ -89,16 +89,56 @@ export function update(f, dt, player, blocked = () => false) {
   return events;
 }
 
-// 투척꾼: 3칸 안이면 물러나고 6칸 밖이면 다가온다(다음 자리가 막혔으면 그대로). 3~7칸이면 오물을 던진다.
-function thrower(f, e, dt, player, blocked) {
+// 이동: 막힌 칸으로는 들어가지 않는다(움직였으면 true)
+const STEPS4 = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+const STEP_LIMIT = 30;   // 칸 길은 아코스에게서 이만큼까지만 센다
+function moveTo(e, t, s, blocked) {
+  const d = dist(e, t);
+  if (d < 1e-9) return false;
+  const k = Math.min(s, d) / d, nx = e.x + (t.x - e.x) * k, nz = e.z + (t.z - e.z) * k;
+  if (blocked(Math.round(nx), Math.round(nz))) return false;
+  e.x = nx;
+  e.z = nz;
+  return true;
+}
+// a에서 b까지 곧게 가는 길에 막힌 칸이 없나(0.25칸마다 본다)
+function clear(a, b, blocked) {
+  const n = Math.ceil(dist(a, b) / 0.25);
+  for (let k = 1; k < n; k++) {
+    if (blocked(Math.round(a.x + ((b.x - a.x) * k) / n), Math.round(a.z + ((b.z - a.z) * k) / n))) return false;
+  }
+  return true;
+}
+// 아코스가 선 칸에서 4방향으로 센 걸음 수(막힌 칸은 빼고, STEP_LIMIT까지): Map('x,z' → 걸음)
+function stepsTo(player, blocked) {
+  const x0 = Math.round(player.x), z0 = Math.round(player.z), steps = new Map([[`${x0},${z0}`, 0]]), q = [[x0, z0]];
+  for (let i = 0; i < q.length; i++) {
+    const [x, z] = q[i], n = steps.get(`${x},${z}`);
+    if (n >= STEP_LIMIT) continue;
+    for (const [dx, dz] of STEPS4) {
+      const k = `${x + dx},${z + dz}`;
+      if (!steps.has(k) && !blocked(x + dx, z + dz)) { steps.set(k, n + 1); q.push([x + dx, z + dz]); }
+    }
+  }
+  return steps;
+}
+// 아코스에게 s만큼 다가간다: 곧게 갈 수 있으면 곧게, 아니면 걸음 수가 하나 적은 이웃 칸 가운데로.
+// (지금 칸 안의 점에서 이웃 칸 가운데로 가는 선은 두 칸 안에만 있어서 모서리를 파고들지 않는다)
+function chase(e, player, s, way) {
+  if (clear(e, player, way.blocked)) return moveTo(e, player, s, way.blocked);
+  const x = Math.round(e.x), z = Math.round(e.z), steps = way.steps(), here = steps.get(`${x},${z}`);
+  const next = here === undefined ? null : STEPS4.map(([dx, dz]) => ({ x: x + dx, z: z + dz }))
+    .find(c => steps.get(`${c.x},${c.z}`) === here - 1);
+  return moveTo(e, next ?? player, s, way.blocked);
+}
+
+// 투척꾼: 3칸 안이면 물러나고(뒤가 막혔으면 그대로) 6칸 밖이면 돌아서라도 다가온다. 3~7칸이면 오물을 던진다.
+function thrower(f, e, dt, player, way) {
   const d = dist(e, player);
   if (d < 1e-6) return;
-  const ux = (player.x - e.x) / d, uz = (player.z - e.z) / d;
-  const way = d < THROWER_NEAR ? -1 : d > THROWER_FAR ? 1 : 0;
-  if (way) {
-    const nx = e.x + ux * ENEMY_SPEED * dt * way, nz = e.z + uz * ENEMY_SPEED * dt * way;
-    if (!blocked(Math.round(nx), Math.round(nz))) { e.x = nx; e.z = nz; }
-  }
+  const ux = (player.x - e.x) / d, uz = (player.z - e.z) / d, s = ENEMY_SPEED * dt;
+  if (d < THROWER_NEAR) moveTo(e, { x: e.x - ux, z: e.z - uz }, s, way.blocked);
+  else if (d > THROWER_FAR) chase(e, player, s, way);
   if (e.cd <= 0 && d >= THROWER_NEAR && d <= THROW_MAX) {
     e.cd = THROW_EVERY;
     f.shots.push({ x: e.x, z: e.z, dx: ux, dz: uz, left: SHOT_RANGE });
@@ -119,21 +159,25 @@ function moveShots(f, dt, player, blocked, events) {
 
 // 돌진꾼: 같은 줄(6칸 안)이면 준비 뒤 그 방향으로 6칸 돌진(닿으면 1피해, 한 번), 막힌 칸에 부딪히면 기절.
 // 줄이 안 맞으면 차이가 작은 축을 줄이고, 줄은 맞는데 멀면 긴 축으로 다가간다.
-function charger(f, e, i, dt, player, blocked, events) {
+function charger(f, e, i, dt, player, way, events) {
+  const { blocked } = way;
   if (e.stun > 0) { e.stun -= dt; return; }
   if (e.dash) {
-    const step = Math.min(CHARGE_SPEED * dt, e.dash.left);
-    const nx = e.x + e.dash.dx * step, nz = e.z + e.dash.dz * step;
-    if (blocked(Math.round(nx), Math.round(nz))) {
-      e.dash = null;
-      e.stun = STUN_TIME;
-      events.push(`stun:${i}`);
-      return;
+    // 반 칸씩 나눠 움직인다(프레임이 길어도 벽을 뚫지 않게)
+    for (let move = Math.min(CHARGE_SPEED * dt, e.dash.left); move > 1e-9;) {
+      const step = Math.min(0.5, move), nx = e.x + e.dash.dx * step, nz = e.z + e.dash.dz * step;
+      if (blocked(Math.round(nx), Math.round(nz))) {
+        e.dash = null;
+        e.stun = STUN_TIME;
+        events.push(`stun:${i}`);
+        return;
+      }
+      e.x = nx;
+      e.z = nz;
+      e.dash.left -= step;
+      move -= step;
+      if (!e.dash.hit && dist(e, player) < CHARGE_HIT && f.invuln <= 0) { e.dash.hit = true; f.hp -= 1; events.push('hurt'); }
     }
-    e.x = nx;
-    e.z = nz;
-    e.dash.left -= step;
-    if (!e.dash.hit && dist(e, player) < CHARGE_HIT && f.invuln <= 0) { e.dash.hit = true; f.hp -= 1; events.push('hurt'); }
     if (e.dash.left <= 1e-9) { e.dash = null; e.cd = ENEMY_COOLDOWN; }
     return;
   }
@@ -151,10 +195,10 @@ function charger(f, e, i, dt, player, blocked, events) {
     events.push(`windup:${i}`);
     return;
   }
+  // 줄이 안 맞으면 차이가 작은 축을 줄인다. 그쪽이 막혔거나 줄이 맞았으면 돌아서라도 다가간다.
   const s = ENEMY_SPEED * dt;
-  const alongX = Math.min(ax, az) < 0.5 ? ax >= az : ax < az;   // 줄이 맞으면 긴 축으로, 아니면 작은 축으로
-  if (alongX) e.x += Math.sign(dx) * Math.min(s, ax);
-  else e.z += Math.sign(dz) * Math.min(s, az);
+  if (Math.min(ax, az) >= 0.5 && moveTo(e, ax < az ? { x: player.x, z: e.z } : { x: e.x, z: player.z }, s, blocked)) return;
+  chase(e, player, s, way);
 }
 
 export function swing(f, player) {
