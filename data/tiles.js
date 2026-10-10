@@ -25,7 +25,7 @@ export const TILES = {
   _: { ground: town(109) },                                       // 돌바닥(광장)
   x: { ground: dun(12) },                                         // 역병에 썩은 땅
   '+': { ground: dun(37) },                                       // 나무 다리
-  '~': { ground: bat(37), solid: true, auto: { on: 'ground', nine: nine(bat, [18, 36, 54]), edge: c => !wet(c) } },   // 물: 풀밭 쪽 물가
+  '~': { ground: bat(37), solid: true, water: true, auto: { on: 'ground', nine: nine(bat, [18, 36, 54]), edge: c => !wet(c) } },   // 물: 풀밭 쪽 물가
   W: { ground: bat(75), solid: true },                            // 멈춘 폭포
   // 나무: 모이면 숲 덩어리 조각, 한 줄로만 서 있으면 한 그루 그림
   T: { ground: town(0), top: town(28), solid: true, auto: { on: 'top', nine: nine(town, [6, 18, 30]), lone: town(28), outside: true, edge: (c, s) => s !== 'T' } },

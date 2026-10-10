@@ -9,7 +9,7 @@ export function parseMap(lines, origin, tiles, stamps) {
       const ch = lines[row][col], t = tiles[ch], s = stamps[ch];
       if (!t && !s) throw new Error(`모르는 기호 '${ch}' (${col}, ${row})`);
       if (s) placed.push({ s, col, row });
-      cells.push(s ? { ground: s.ground, top: null, solid: true } : { ground: t.ground, top: t.top ?? null, solid: !!t.solid });
+      cells.push(s ? { ground: s.ground, top: null, solid: true } : { ground: t.ground, top: t.top ?? null, solid: !!t.solid, ...(t.water && { water: true }) });
       if (t?.light) lights.push({ x: origin.minX + col, z: origin.minZ + row, fire: !!t.fire });
     }
   }

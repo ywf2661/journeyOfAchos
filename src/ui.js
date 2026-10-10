@@ -18,10 +18,33 @@ export function showPrompt(text) {
   $('prompt').hidden = !text;
 }
 
+// 대화창 얼굴 칸: 말하는 사람(대본의 who)별 스프라이트 시트와 얼굴이 있는 16×16 자리(정면 서 있기 프레임)
+const FACES = { '아코스': ['assets/sprites/achos.png', 11, 7], '@aion': ['assets/sprites/aion.png', 12, 9] };
+const faceImg = {};
+function showFace(who) {
+  const f = FACES[who], el = $('face');
+  el.hidden = !f;
+  if (!f) return;
+  const [url, sx, sy] = f, img = (faceImg[url] ??= Object.assign(new Image(), { src: url }));
+  const paint = () => { const g = el.getContext('2d'); g.clearRect(0, 0, 16, 16); g.drawImage(img, sx, sy, 16, 16, 0, 0, 16, 16); };
+  if (img.complete) paint(); else img.onload = paint;
+}
+
+// 지역에 들어설 때 위쪽에 이름을 잠깐 띄운다
+let bannerTimer;
+export function showBanner(text) {
+  const el = $('banner');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
 // 글자를 한 자씩 보여 주고, 다 나오면 선택지 버튼을 붙인다.
 export function showLine(view, speaker, onChoose) {
   const textEl = $('text'), choicesEl = $('choices');
   $('dialog').hidden = false;
+  showFace(view.who);
   $('who').textContent = speaker;
   $('who').hidden = !speaker;
   textEl.classList.toggle('narration', !speaker);

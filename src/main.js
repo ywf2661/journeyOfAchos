@@ -15,6 +15,7 @@ import { createInput } from './input.js';
 import { createTouchControls } from './touch.js';
 import { loadSheets, createRenderer } from './draw.js';
 import * as ui from './ui.js';
+import { sfx, music } from './sound.js';
 
 // 주로 터치로 조작하는 기기(휴대폰·태블릿). 부팅 때 한 번 정한다.
 const TOUCH = matchMedia('(pointer: coarse)').matches;
@@ -33,6 +34,17 @@ let mode = 'title';   // title | loading | explore | dialogue | combat | end | e
 let dialogue = null, view = null, ending = false;
 let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   // heroSlash: 베기 동작이 끝날 때까지 남은 시간
 let charge = null, waves = [], flash = 0;   // charge: 전투 중 Z를 누르고 있는 시간(안 누르면 null)
+let stopT = 0, shakeT = 0, parts = [];   // 맞힐 때 잠깐 멈춤, 화면 흔들림, 불꽃·연기·흙먼지
+// 지역 배경음악(assets/audio/bgm)
+const MUSIC = { 1: 'town1', 4: 'dungeon1', 5: 'dread', 2: 'timeguardian', 3: 'town2' };
+const regionMusic = () => MUSIC[state.region];
+// x, z에서 n개를 사방으로 흩뿌린다(speed: 초당 칸, rise: 위로 떠오르는 속도)
+function burst(x, z, n, color, speed, life, { rise = 0, size = 2 } = {}) {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, v = speed * (0.5 + Math.random() * 0.5);
+    parts.push({ x, z, vx: Math.cos(a) * v, vz: Math.sin(a) * v - rise, life, max: life, color, size });
+  }
+}
 let fieldStart = null;   // 필드 전투가 시작된 칸과 방향(지면 여기서 다시 시작한다)
 // 지역·날짜를 바꾸는 동안 그리기를 멈춘다. 상태는 이미 다음 날로 바뀌었지만, 화면이 다 어두워질 때까지 지난 장면을 그대로 둔다.
 let transitioning = false;
@@ -73,9 +85,11 @@ async function enterRegion() {
   if (state.pendingFight && FIGHTS[state.pendingFight].field) state.pendingFight = null;
   refreshBlocked();
   showLife();
+  music(regionMusic());
   transitioning = false;
   saveGame(storage, state);
   await ui.fade(false);
+  ui.showBanner(typeof region().light === 'object' ? `${region().name} · ${state.day}일째` : region().name);
   if (state.pendingFight) startFight(state.pendingFight);
   else mode = 'explore';
 }
@@ -104,6 +118,7 @@ function eatHerb(c) {
   state.hp += 1;
   markDone(state, h);
   ui.toast('약초를 씹었다. 기운이 조금 돈다.');
+  sfx('herb');
   saveGame(storage, state);
   showLife();
 }
@@ -182,6 +197,7 @@ function startFight(id, full = false) {
   else if (full && fieldStart) hero = createWalker(fieldStart.x, fieldStart.z, fieldStart.dir);   // 필드 전투: 시작한 칸으로
   looks = fight.enemies.map(() => ({ red: 0, white: 0, gone: 0 }));
   ui.setFrozenLook(!!def.frozen);
+  music(def.frozen ? 'battle3' : def.field ? 'battle1' : 'battle2');
   tickAcc = 0;
   mode = 'combat';
 }
@@ -190,8 +206,9 @@ function stepFight(dt) {
   for (const ev of updateFight(fight, dt, hero, blocked)) {
     const [kind, i] = ev.split(':');
     if (kind === 'windup') looks[i].red = fight.enemies[i].windup;   // 준비하는 동안 붉게
-    if (kind === 'hurt') hurt = 0.4;
-    if (kind === 'lost') return loseFight();
+    if (kind === 'hurt') { hurt = 0.4; shakeT = 0.25; sfx('hurt'); }
+    if (kind === 'stun') { sfx('stun'); burst(fight.enemies[i].x, fight.enemies[i].z, 5, '#c8b08a', 1.5, 0.35); }
+    if (kind === 'lost') { sfx('lose'); return loseFight(); }
   }
   if (fight.def.frozen && (tickAcc += dt) >= 1) { tickAcc -= 1; ui.tick(); }
   ui.showHud(fight.hp, PLAYER_MAX_HP, fight.def.frozen ? fight.def.timeLimit - fight.time : null, fight.gauge, HOLY_GAUGE);
@@ -201,6 +218,7 @@ function attack() {
   const events = swing(fight, hero);
   if (!events.length) return;
   heroSlash = SLASH_TIME;
+  sfx('slash');
   showHits(events);
 }
 
@@ -210,16 +228,29 @@ function holyAction() {
   if (!events.length) return;
   heroSlash = SLASH_TIME;
   flash = 0.12;
+  shakeT = 0.15;
+  sfx('holy');
   waves.push({ x: hero.x, z: hero.z, facing: hero.facing, t: 0 });
   showHits(events);
 }
 
+// 맞힌 적: 흰빛, 불꽃, 살짝 밀려남(막힌 칸이면 그대로), 쓰러지면 검은 연기. 맞히면 아주 잠깐 멈춘다(손맛).
 function showHits(events) {
+  let hit = false;
   for (const ev of events) {
     const [kind, i] = ev.split(':');
-    if (kind === 'hit' || kind === 'down') looks[i].white = 0.15;
+    if (kind === 'hit' || kind === 'down') {
+      const e = fight.enemies[i], d = Math.hypot(e.x - hero.x, e.z - hero.z) || 1;
+      const nx = e.x + ((e.x - hero.x) / d) * 0.35, nz = e.z + ((e.z - hero.z) / d) * 0.35;
+      if (!blocked(Math.round(nx), Math.round(nz))) { e.x = nx; e.z = nz; }
+      looks[i].white = 0.15;
+      burst(e.x, e.z, 6, '#ffffff', 4, 0.22);
+      if (kind === 'down') burst(e.x, e.z, 12, '#2a2230', 1.2, 0.7, { rise: 1.2, size: 3 });
+      hit = true;
+    }
     if (kind === 'won') winCurrentFight();
   }
+  if (hit) { sfx('hit'); stopT = 0.06; }
 }
 
 // 피하기: 무적(combat.dodge)과 함께 누르고 있는 방향(없으면 뒤로) 한 칸
@@ -241,6 +272,7 @@ function winCurrentFight() {
   state.hp = fight.hp;   // 남은 체력이 다음 전투로 이어진다
   setTimeout(() => {
     clearFight();
+    music(regionMusic());
     openDialogue(winFight(state, FIGHTS));
   }, 1200);
 }
@@ -274,9 +306,12 @@ async function finish() {
 // 버튼을 누르는 순간: 모드에 따라 Z·X·방향의 뜻이 다르다
 // 퍼즐 이벤트: 틀린 순서 알림, 시계 소리, 풀리면 플래그·저장·문 열기·나레이션
 function onPuzzle(events) {
-  if (events.includes('wrong')) ui.toast('돌판의 빛이 꺼졌다.');
-  if (events.includes('flow') || events.includes('stop')) ui.tick();
+  if (events.includes('push')) sfx('push');
+  if (events.includes('step')) sfx('step');
+  if (events.includes('wrong')) { ui.toast('돌판의 빛이 꺼졌다.'); sfx('wrong'); }
+  if (events.includes('flow') || events.includes('stop')) sfx('clock');
   if (!events.includes('solved')) return;
+  sfx('solved');
   const say = applySolved(state, puzzle.def);
   saveGame(storage, state);
   refreshBlocked();
@@ -337,7 +372,8 @@ function render(dt) {
     const sp = SPRITES[a.m];
     return {
       ...look(sp, { dir: follow ? 'up' : 'down' }), tint: a.tint ?? sp.tint,
-      x: follow ? hero.x + 1 : a.x, z: follow ? hero.z : a.z, lie: a.lie, bob: follow && bob(hero.moving),
+      x: follow ? hero.x + 1 : a.x, z: follow ? hero.z : a.z, lie: a.lie,
+      bob: follow ? bob(hero.moving) : !a.lie && Math.floor(time * 1.6 + a.x * 0.7) % 2 === 0,   // 서 있는 사람은 숨 쉬듯 들썩인다
     };
   });
   things.push({
@@ -350,7 +386,7 @@ function render(dt) {
     if (fight && state.pendingFight === id) continue;
     for (const [x, z, kind] of d.enemies) {
       const p = enemyLook(kind);
-      things.push({ art: p.art, tint: p.tint, x, z, flip: x > hero.x });
+      things.push({ art: p.art, tint: p.tint, tintA: 0.85, x, z, flip: x > hero.x, bob: Math.floor(time * 3 + x) % 2 === 0 });
     }
   }
   fight?.enemies.forEach((e, i) => {
@@ -361,12 +397,18 @@ function render(dt) {
     if (l.gone > 0.6) return;
     things.push({
       art: p.art, x: e.x, z: e.z, flip: e.x > hero.x,
-      tint: l.white > 0 ? '#ffffff' : l.red > 0 ? '#c0392b' : p.tint,
+      tint: l.white > 0 ? '#ffffff' : l.red > 0 ? '#c0392b' : p.tint, tintA: 0.85,
+      bob: e.hp > 0 && !e.stun && Math.floor(time * 3 + i) % 2 === 0, stars: e.stun > 0,
       alpha: e.hp <= 0 && Math.floor(l.gone * 10) % 2 ? 0.2 : e.stun > 0 ? 0.5 : 1,   // 기절한 돌진꾼은 반투명
     });
   });
+  parts = parts.filter(p => (p.life -= dt) > 0);
+  for (const p of parts) { p.x += p.vx * dt; p.z += p.vz * dt; p.vx *= 0.9; p.vz *= 0.9; }
+  shakeT = Math.max(0, shakeT - dt);
+  const shake = shakeT > 0 ? [Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 4 - 2)] : null;
   renderer.draw({
-    map: map(), cam: hero, things, t: time, flash,
+    map: map(), cam: hero, things, t: time, flash, shake,
+    parts: parts.map(p => ({ x: p.x, z: p.z, color: p.color, size: p.size, a: p.life / p.max })),
     puzzle: puzzle && pieces(puzzle),
     shots: fight?.shots ?? [],
     herbs: herbsFor(region(), state),
@@ -384,10 +426,12 @@ function frame(now) {
   last = now;
   time += dt;
   document.body.dataset.mode = mode;   // 터치 조작이 보일지는 CSS(body.touch[data-mode])가 정한다
+  const halt = stopT > 0;   // 맞힌 순간 아주 잠깐 전투가 멈춘다
+  stopT = Math.max(0, stopT - dt);
   if (hero && ending) {
     // 엔딩 자동 걷기는 인물을 무시하고, 맵의 막힌 칸(지평선의 성)에서 선다
     step(hero, { dir: 'up', auto: true }, dt, (x, z) => isSolid(map(), x, z));
-  } else if (hero && (mode === 'explore' || mode === 'combat')) {
+  } else if (hero && !halt && (mode === 'explore' || mode === 'combat')) {
     if (charge !== null) charge += dt;
     const inp = { ...input.state(), slow: mode === 'combat' && charge !== null };   // 모으는 동안은 반 속도
     // 밀기: 서 있는 채로 바라보는 쪽을 누르고 있으면 앞 칸의 돌을 민다(밀린 칸으로는 이어서 걸어 들어간다)
@@ -400,13 +444,14 @@ function frame(now) {
     const c = standing(hero), cell = `${c.x},${c.z}`;
     if (cell !== lastCell) {
       lastCell = cell;
+      if (hero.moving) burst(c.x, c.z + 0.4, 2, '#b08a5a', 0.6, 0.3);   // 걸을 때 흙먼지
       if (mode === 'explore' && puzzleOn()) onPuzzle(stepOn(puzzle, c.x, c.z));
       if (mode === 'explore') eatHerb(c);
     }
   }
   if (puzzle && mode === 'explore') tickPuzzle(puzzle, dt);
   if (mode === 'explore') checkTriggers();
-  if (mode === 'combat') stepFight(dt);
+  if (mode === 'combat' && !halt) stepFight(dt);
   if (hero && !transitioning) render(dt);
   requestAnimationFrame(frame);
 }

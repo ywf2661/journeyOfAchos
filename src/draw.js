@@ -49,9 +49,9 @@ export function createRenderer(canvas, sheets) {
   };
 
   // 색을 덧칠한 스프라이트(왕의 금빛, 역병의 검정, 맞을 때의 흰빛)는 한 번 만들어 둔다
-  function sprite(art, tint) {
+  function sprite(art, tint, strength = 0.65) {
     if (!tint) return src(art);
-    const key = `${art}:${tint}`;
+    const key = `${art}:${tint}:${strength}`;
     if (!tinted.has(key)) {
       const [img, sx, sy, w, h] = src(art);
       const c = document.createElement('canvas');
@@ -60,7 +60,7 @@ export function createRenderer(canvas, sheets) {
       const g = c.getContext('2d');
       g.drawImage(img, sx, sy, w, h, 0, 0, w, h);
       g.globalCompositeOperation = 'source-atop';
-      g.globalAlpha = 0.65;
+      g.globalAlpha = strength;
       g.fillStyle = tint;
       g.fillRect(0, 0, w, h);
       tinted.set(key, [c, 0, 0, w, h]);
@@ -77,8 +77,9 @@ export function createRenderer(canvas, sheets) {
     const { map } = s;
     // 카메라: 따라갈 대상이 화면 가운데. 맵 가장자리에서는 멈추고, 맵이 화면보다 작으면 가운데에 둔다.
     const clamp = (v, hi) => (hi < 0 ? hi / 2 : Math.min(hi, Math.max(0, v)));
-    const left = Math.round(clamp((s.cam.x - map.minX + 0.5) * T - W / 2, map.w * T - W));
-    const top = Math.round(clamp((s.cam.z - map.minZ + 0.5) * T - H / 2, map.h * T - H));
+    const [sx0, sz0] = s.shake ?? [0, 0];   // 맞을 때 화면 흔들림(게임 화소)
+    const left = Math.round(clamp((s.cam.x - map.minX + 0.5) * T - W / 2, map.w * T - W)) + sx0;
+    const top = Math.round(clamp((s.cam.z - map.minZ + 0.5) * T - H / 2, map.h * T - H)) + sz0;
     const px = x => Math.round((x - map.minX) * T - left), py = z => Math.round((z - map.minZ) * T - top);
 
     ctx.fillStyle = '#000';
@@ -89,6 +90,11 @@ export function createRenderer(canvas, sheets) {
       for (let c = c0; c <= c1; c++) {
         const cell = map.cells[r * map.w + c];
         tile(cell.ground, c * T - left, r * T - top);
+        // 물: 칸마다 정해진 자리에서 반짝임이 천천히 옮겨 다닌다
+        if (cell.water && (c * 7 + r * 13 + Math.floor(s.t * 1.5)) % 11 === 0) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          ctx.fillRect(c * T - left + 3 + (r * 5) % 9, r * T - top + 4 + (c * 3) % 8, 3, 1);
+        }
         if (cell.shade) { ctx.fillStyle = 'rgba(20, 40, 20, 0.22)'; ctx.fillRect(c * T - left, r * T - top, T, 3); }   // 키 큰 것 아래 그림자
         if (cell.top) tile(cell.top, c * T - left, r * T - top);
       }
@@ -163,7 +169,7 @@ export function createRenderer(canvas, sheets) {
     // 인물·적: 아래(남쪽)에 있는 것을 나중에 그려 앞에 보이게 한다.
     // 그림의 발(foot, 없으면 16×16 칸의 아래 가운데)을 칸의 아래 가운데에 맞춘다 — 큰 스프라이트는 머리와 칼이 위 칸까지 올라온다.
     for (const o of [...s.things].sort((a, b) => a.z - b.z)) {
-      const [img, sx, sy, w, h] = sprite(o.art, o.tint);
+      const [img, sx, sy, w, h] = sprite(o.art, o.tint, o.tintA);
       const [fx, fy] = o.foot ?? [T / 2, T - 1];
       ctx.save();
       ctx.globalAlpha = o.alpha ?? 1;
@@ -177,6 +183,14 @@ export function createRenderer(canvas, sheets) {
         ctx.drawImage(img, sx, sy, w, h, -fx, -fy, w, h);
       }
       ctx.restore();
+      // 기절: 머리 위를 도는 노란 별 셋
+      if (o.stars) {
+        ctx.fillStyle = '#ffe066';
+        for (let k = 0; k < 3; k++) {
+          const a = s.t * 6 + k * 2.1;
+          ctx.fillRect(Math.round(px(o.x) + T / 2 + Math.cos(a) * 5) - 1, Math.round(py(o.z) - 1 + Math.sin(a) * 2), 2, 2);
+        }
+      }
     }
     // 투척꾼의 오물: 올리브색 덩어리에 어두운 테
     ctx.fillStyle = '#6b8f2a';
@@ -217,6 +231,21 @@ export function createRenderer(canvas, sheets) {
       }
       ctx.drawImage(shade, 0, 0);
     }
+    // 저녁·밤: 화면 가장자리를 어둡게(가운데로 눈이 가게)
+    if (s.light === 'night' || s.light === 'dusk') {
+      const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.7);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, `rgba(0,0,0,${s.light === 'night' ? 0.55 : 0.35})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+    // 불꽃·연기·흙먼지: 작은 네모(a: 남은 비율)
+    for (const p of s.parts ?? []) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.a));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(px(p.x) + T / 2) - 1, Math.round(py(p.z) + T / 2) - 1, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
     // 성휘참: 금빛 초승달 칼날이 앞으로 4칸 뻗어 나가며 옅어진다(p: 0→1). 빛이라 어둠(조명) 위에 그린다.
     for (const w of s.waves ?? []) {
       const a = Math.PI / 2 - w.facing, reach = w.p * 4 * T;
