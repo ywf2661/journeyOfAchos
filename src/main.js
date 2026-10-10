@@ -36,7 +36,7 @@ let fight = null, looks = [], heroSlash = 0, hurt = 0, tickAcc = 0, time = 0;   
 let charge = null, waves = [], flash = 0;   // charge: 전투 중 Z를 누르고 있는 시간(안 누르면 null)
 let stopT = 0, shakeT = 0, parts = [];   // 맞힐 때 잠깐 멈춤, 화면 흔들림, 불꽃·연기·흙먼지
 // 지역 배경음악(assets/audio/bgm)
-const MUSIC = { 1: 'town1', 4: 'dungeon1', 5: 'dread', 2: 'timeguardian', 3: 'town2' };
+const MUSIC = { 1: 'town1', 4: 'dungeon1', 5: 'dread', 2: 'dungeon2', 3: 'town2' };   // 골짜기: 고요하고 느린 곡
 const regionMusic = () => MUSIC[state.region];
 // x, z에서 n개를 사방으로 흩뿌린다(speed: 초당 칸, rise: 위로 떠오르는 속도)
 function burst(x, z, n, color, speed, life, { rise = 0, size = 2 } = {}) {

@@ -66,7 +66,13 @@ export function showLine(view, speaker, onChoose) {
     sel = 0;
     markChoice();
   }
-  typing = { id: setInterval(() => { textEl.textContent += chars[i++] ?? ''; if (i >= chars.length) finish(); }, 28), finish };
+  // 글자 두 개마다 한 번(빈칸·문장부호는 건너뛴다) 띡
+  typing = { id: setInterval(() => {
+    const ch = chars[i++] ?? '';
+    textEl.textContent += ch;
+    if (i % 2 === 1 && /[\p{L}\p{N}]/u.test(ch)) blip(view.who);
+    if (i >= chars.length) finish();
+  }, 28), finish };
   if (!chars.length) finish();
 }
 
@@ -150,6 +156,22 @@ function wakeAudio() {
   } catch { /* 소리 없이 진행한다 */ }
 }
 for (const type of ['click', 'touchend', 'keydown']) addEventListener(type, wakeAudio);
+
+// 대화 글자 소리: 짧은 삼각파 '띡'. 말하는 사람마다 음높이가 다르다(나레이션은 낮게).
+const VOICE = { '아코스': 330, '@aion': 620, '': 240 };
+function blip(who) {
+  try {
+    audio ??= new AudioContext();
+    const t = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = VOICE[who] ?? 470;
+    gain.gain.setValueAtTime(0.06, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t);
+    osc.stop(t + 0.05);
+  } catch { /* 소리 없이 진행한다 */ }
+}
 
 // 시계 째깍 소리: 짧은 사각파 두 번을 합성한다. 브라우저가 소리를 막으면 조용히 넘어간다.
 export function tick() {
